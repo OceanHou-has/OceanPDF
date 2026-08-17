@@ -1,0 +1,17 @@
+// 全局样式文件
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Microsoft YaHei', Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+#app {
+  width: 100%;
+  height: 100vh;
+}

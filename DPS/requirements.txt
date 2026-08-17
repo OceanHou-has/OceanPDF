@@ -1,0 +1,28 @@
+# ============================================
+# PP-DocLayoutV2 + OCR 服务依赖清单
+# ============================================
+
+# Web 服务框架
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+
+# PDF 处理
+PyMuPDF==1.23.8
+
+# PaddlePaddle (需要根据环境选择 GPU 或 CPU 版本)
+# GPU 版本通过单独命令安装，见安装指南
+# CPU 版本通过单独命令安装，见安装指南
+
+# PaddleOCR (包含版面分析和文字识别)
+paddleocr>=3.0.0
+
+# 图像处理
+Pillow>=10.0.0
+opencv-python>=4.8.0
+
+# 数学计算
+numpy>=1.24.0
+
+# 网络请求 (用于测试脚本)
+requests>=2.31.0

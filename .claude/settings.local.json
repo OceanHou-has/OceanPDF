@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(python:*)",
+      "Bash(findstr /i \"venv\")",
+      "Bash(conda env list:*)",
+      "Bash(nvidia-smi:*)",
+      "Bash(conda run:*)",
+      "WebSearch",
+      "Bash(\"G:\\MY_Project\\OceanPDF2.0-260101\\OceanPDF2.0-260101\\DPS\\venv\\Scripts\\python.exe\":*)",
+      "Bash(\"G:\\MY_Project\\OceanPDF2.0-260101\\OceanPDF2.0-260101\\DPS\\venv\\Scripts\\python.exe\" -c \"import fitz; print(''PyMuPDF:'', fitz.__version__)\")",
+      "Bash(\"G:\\MY_Project\\OceanPDF2.0-260101\\OceanPDF2.0-260101\\DPS\\venv\\Scripts\\python.exe\" -c \"import paddleocr; print(''paddleocr OK'')\")",
+      "Bash(\"G:\\MY_Project\\OceanPDF2.0-260101\\OceanPDF2.0-260101\\DPS\\venv\\Scripts\\python.exe\" -c \"import PIL; print(''Pillow:'', PIL.__version__)\")",
+      "Bash(\"G:\\MY_Project\\OceanPDF2.0-260101\\OceanPDF2.0-260101\\DPS\\venv\\Scripts\\python.exe\" -c \"import requests; print(''requests:'', requests.__version__)\")",
+      "Bash(\"G:\\MY_Project\\OceanPDF2.0-260101\\OceanPDF2.0-260101\\DPS\\venv\\Scripts\\python.exe\" -c \"import paddle; print(''paddlepaddle:'', paddle.__version__)\")",
+      "Bash(\"G:\\MY_Project\\OceanPDF2.0-260101\\OceanPDF2.0-260101\\DPS\\venv\\Scripts\\pip.exe\":*)",
+      "Bash(\"G:\\MY_Project\\OceanPDF2.0-260101\\OceanPDF2.0-260101\\DPS\\venv\\Scripts\\pip.exe\" install \"paddleocr>=3.0.0\")",
+      "Bash(\"G:\\MY_Project\\OceanPDF2.0-260101\\OceanPDF2.0-260101\\DPS\\venv\\Scripts\\python.exe\" -c \"import paddle; print(''GPU available:'', paddle.device.is_compiled_with_cuda()); print(''GPU count:'', paddle.device.cuda.device_count()); print(''Current device:'', paddle.device.get_device())\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
