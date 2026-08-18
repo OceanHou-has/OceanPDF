@@ -658,35 +658,13 @@ class PDFGenerator:
             for page_num in range(len(doc)):
                 page = doc[page_num]
                 page_tasks = tasks_by_page.get(page_num, [])
-
-                erase_ok = True
-                if mode == "overlay" and page_tasks:
-                    erase_rects: List[fitz.Rect] = []
-                    for t in page_tasks:
-                        bbox = t.get("bbox")
-                        if not bbox or len(bbox) < 4:
-                            continue
-                        try:
-                            element_type = t.get("element_type", "paragraph")
-                            rect = self._get_redaction_rect_for_task(page, bbox, element_type)
-                            erase_rects.append(rect)
-                        except Exception:
-                            continue
-                    logger.info(
-                        f"准备删除原文区域: page={page_num} tasks={len(page_tasks)} rects={len(erase_rects)}"
-                    )
-                    erase_ok = self._erase_regions_on_page(page, erase_rects, fill=(1, 1, 1))
-
-                for task in page_tasks:
-                    success = self._render_task_to_page(
-                        page,
-                        task,
-                        background_color=None if erase_ok else (1, 1, 1)
-                    )
-                    if success:
-                        rendered_tasks += 1
-                    else:
-                        failed_tasks += 1
+                page_rendered, page_failed = self._render_translation_overlay_on_page(
+                    page,
+                    page_tasks,
+                    erase_source_text=(mode == "overlay")
+                )
+                rendered_tasks += page_rendered
+                failed_tasks += page_failed
             
             # 保存输出文件
             output_dir = Path(output_path).parent
@@ -716,6 +694,61 @@ class PDFGenerator:
                 "success": False,
                 "error": str(e)
             }
+
+    def _render_translation_overlay_on_page(
+        self,
+        page: fitz.Page,
+        page_tasks: List[Dict],
+        erase_source_text: bool = True
+    ) -> Tuple[int, int]:
+        """
+        在保留源页面非文本内容的前提下，用译文替换原文区域。
+
+        该流程同时供普通译文导出和双语译文页复用，确保图片、表格线、
+        公式及其他未参与翻译的页面内容不会因创建空白页而丢失。
+        """
+        erase_ok = True
+        if erase_source_text and page_tasks:
+            erase_rects: List[fitz.Rect] = []
+            for task in page_tasks:
+                bbox = task.get("bbox")
+                if not bbox or len(bbox) < 4:
+                    continue
+                try:
+                    element_type = task.get("element_type", "paragraph")
+                    erase_rects.append(
+                        self._get_redaction_rect_for_task(page, bbox, element_type)
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"计算原文擦除区域失败: page={page.number} "
+                        f"task_id={task.get('task_id')} err={str(e)}"
+                    )
+
+            logger.info(
+                f"准备删除原文区域: page={page.number} "
+                f"tasks={len(page_tasks)} rects={len(erase_rects)}"
+            )
+            erase_ok = self._erase_regions_on_page(
+                page,
+                erase_rects,
+                fill=(1, 1, 1)
+            )
+
+        rendered_tasks = 0
+        failed_tasks = 0
+        for task in page_tasks:
+            success = self._render_task_to_page(
+                page,
+                task,
+                background_color=None if erase_ok else (1, 1, 1)
+            )
+            if success:
+                rendered_tasks += 1
+            else:
+                failed_tasks += 1
+
+        return rendered_tasks, failed_tasks
     
     def _group_tasks_by_page(self, tasks: List[Dict]) -> Dict[int, List[Dict]]:
         """
@@ -988,45 +1021,46 @@ class PDFGenerator:
         
         原文页后面紧跟译文页
         """
-        # 创建新文档
+        # 创建新文档，并复制一份源文档作为译文页底稿。译文页必须从
+        # 源页开始处理，才能保留图片、表格线、公式等非翻译内容。
         new_doc = fitz.open()
+        translated_doc = fitz.open()
+        translated_doc.insert_pdf(source_doc)
         
         translation_tasks = translation_data.get("translation_tasks", [])
         tasks_by_page = self._group_tasks_by_page(translation_tasks)
         
         for page_num in range(len(source_doc)):
-            source_page = source_doc[page_num]
-            source_rect = source_page.rect
-            
-            # 1. 复制原文页
-            new_page = new_doc.new_page(
-                width=source_rect.width,
-                height=source_rect.height
-            )
-            new_page.show_pdf_page(source_rect, source_doc, page_num)
-            
-            # 2. 创建译文页
-            trans_page = new_doc.new_page(
-                width=source_rect.width,
-                height=source_rect.height
-            )
-            
-            # 填充白色背景
-            shape = trans_page.new_shape()
-            shape.draw_rect(source_rect)
-            shape.finish(color=None, fill=(1, 1, 1))
-            shape.commit()
-            
-            # 绘制译文
+            # 先在源页副本上擦除原文并绘制译文，复用普通译文导出的
+            # 覆盖逻辑，避免双语模式维护一套只绘制文本的空白页逻辑。
+            translated_page = translated_doc[page_num]
             page_tasks = tasks_by_page.get(page_num, [])
-            for task in page_tasks:
-                self._render_task_to_page(trans_page, task)
+            self._render_translation_overlay_on_page(
+                translated_page,
+                page_tasks,
+                erase_source_text=True
+            )
+
+            # 原文页后紧跟保留非文本内容的译文页。
+            new_doc.insert_pdf(
+                source_doc,
+                from_page=page_num,
+                to_page=page_num,
+                links=False
+            )
+            new_doc.insert_pdf(
+                translated_doc,
+                from_page=page_num,
+                to_page=page_num,
+                links=False
+            )
         
         # 保存
         output_dir = Path(output_path).parent
         output_dir.mkdir(parents=True, exist_ok=True)
-        new_doc.save(output_path)
+        new_doc.save(output_path, garbage=4, deflate=True)
         new_doc.close()
+        translated_doc.close()
         
         logger.info(f"✅ 双语PDF生成完成（交替排列）: {output_path}")
         

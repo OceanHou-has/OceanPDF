@@ -7,28 +7,23 @@
   >
     <div class="panel-header">
       <div class="header-left">
-        <div class="header-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-            <path d="M7 3H5C3.89543 3 3 3.89543 3 5V7M7 21H5C3.89543 21 3 20.1046 3 19V17M21 5V7C21 8.10457 20.1046 9 19 9H17M21 19V17C21 15.8954 20.1046 15 19 15H17M17 21H19C20.1046 21 21 20.1046 21 19M7 17H17M7 7H17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
-          </svg>
-        </div>
+        <div class="header-icon">🐳</div>
         <div class="header-text">
           <span class="panel-title">标注面板</span>
-          <span class="panel-hint">选择类型标记元素</span>
+          <span class="panel-hint">选择类型标记元素～</span>
         </div>
       </div>
       <div class="header-right">
-        <button class="collapse-btn" @click.stop="toggleCollapse">
-          <svg 
-            class="collapse-icon" 
+        <button class="collapse-btn" @click.stop="toggleCollapse" :title="isCollapsed ? '展开面板' : '收起面板'">
+          <svg
+            class="collapse-icon"
             :class="{ 'is-rotated': isCollapsed }"
-            width="16" 
-            height="16" 
-            viewBox="0 0 24 24" 
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
             fill="none"
           >
-            <path d="M18 15l-6-6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M18 15l-6-6-6 6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </button>
         <div class="drag-indicator">
@@ -42,21 +37,19 @@
           </svg>
         </div>
       </div>
+      <span class="header-star s1" aria-hidden="true">✦</span>
+      <span class="header-star s2" aria-hidden="true">✧</span>
     </div>
 
     <div class="panel-content" v-show="!isCollapsed" @mousedown.stop>
       <div class="content-section">
         <div class="section-label">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-            <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          </svg>
+          <span class="section-emoji">🎨</span>
           <span>标注类型</span>
         </div>
 
         <div v-if="annotationTypes.length === 0" class="empty-state">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
-            <path d="M12 8v4m0 4h.01M5.07 19H19a2 2 0 001.75-2.97L13.75 4a2 2 0 00-3.5 0L3.32 16.03A2 2 0 005.07 19z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
+          <span class="empty-emoji">🐚</span>
           <span>没有标注类型数据</span>
         </div>
         <div class="type-grid" v-else>
@@ -64,13 +57,12 @@
             v-for="type in annotationTypes"
             :key="type.code"
             class="type-button"
-            :style="{ 
-              '--type-color': type.color
-            }"
+            :style="{ '--type-color': type.color }"
             @click="selectType(type.code)"
           >
             <div class="type-color-bar"></div>
             <div class="type-info">
+              <span class="type-dot"></span>
               <span class="type-name">{{ type.label }}</span>
             </div>
             <div class="type-check">
@@ -94,7 +86,7 @@
           </div>
         </div>
         <div class="footer-actions">
-          <button 
+          <button
             class="cancel-btn"
             :disabled="!selectedElement && selectedCount === 0"
             @click="cancelSelection"
@@ -104,7 +96,7 @@
             </svg>
             取消标注
           </button>
-          <button 
+          <button
             class="clear-btn"
             :disabled="!selectedElement && selectedCount === 0"
             @click="clearAnnotation"
@@ -258,144 +250,218 @@ onUnmounted(() => {
 </script>
 
 <style scoped lang="scss">
+// ===== 卡通海洋风配色（与翻译配置弹窗统一） =====
+$ink: #3d5a73;
+$sub-ink: #8aa2b8;
+$blue: #58b6f0;
+$blue-dark: #2e8bc7;
+$green: #6fce93;
+$green-dark: #3fae70;
+$coral: #f58b8b;
+$coral-dark: #d95f5f;
+
 .annotation-panel {
   position: fixed;
   width: min(340px, 25vw);
   max-width: 340px;
   min-width: 280px;
-  background: linear-gradient(180deg, #f0f7ff 0%, #ffffff 100%);
-  backdrop-filter: blur(20px) saturate(180%);
-  border-radius: 16px;
-  box-shadow: 
-    0 8px 32px rgba(0, 0, 0, 0.12),
-    0 2px 8px rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  background:
+    radial-gradient(circle at 15% 20%, #eaf7ff 0 2px, transparent 2px),
+    radial-gradient(circle at 80% 60%, #eaf7ff 0 2px, transparent 2px),
+    linear-gradient(180deg, #fdfeff 0%, #f4fbff 100%);
+  background-size: 80px 80px, 110px 110px, 100% 100%;
+  border-radius: 22px;
+  border: 3px solid #cfe9fb;
+  box-shadow: 0 8px 0 rgba(88, 182, 240, 0.16), 0 18px 40px rgba(46, 90, 122, 0.2);
   z-index: 1000;
-  transition: box-shadow 0.3s ease, transform 0.2s ease;
+  transition: box-shadow 0.25s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
   overflow: hidden;
-  
+  animation: panel-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+
   &.is-dragging {
-    box-shadow: 
-      0 16px 48px rgba(0, 0, 0, 0.2),
-      0 4px 16px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 12px 0 rgba(88, 182, 240, 0.18), 0 26px 52px rgba(46, 90, 122, 0.28);
     cursor: move;
-    transform: scale(1.02);
+    transform: scale(1.02) rotate(-0.5deg);
   }
-  
-  &.is-collapsed {
-    .panel-header {
-      border-radius: 16px;
-    }
+}
+
+@keyframes panel-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
   }
 }
 
 .panel-header {
+  position: relative;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 16px;
-  background: linear-gradient(135deg, #1e88e5 0%, #42a5f5 100%);
+  padding: 12px 14px;
+  background: linear-gradient(135deg, #6fc7f5 0%, #4aa9ec 100%);
   cursor: move;
   user-select: none;
-  
+  overflow: hidden;
+
+  // 卡通波浪底边
+  &::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 10px;
+    background:
+      radial-gradient(circle at 7px -3px, transparent 0 9px, #fdfeff 9px) 0 0 / 22px 10px repeat-x;
+  }
+
   .header-left {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
+    position: relative;
+    z-index: 1;
   }
-  
+
   .header-icon {
-    width: 34px;
-    height: 34px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
+    width: 36px;
+    height: 36px;
+    background: rgba(255, 255, 255, 0.95);
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    box-shadow: 0 3px 0 rgba(46, 139, 199, 0.35);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
+    font-size: 20px;
+    animation: mascot-bounce 2.8s ease-in-out infinite;
   }
-  
+
   .header-text {
     display: flex;
     flex-direction: column;
     gap: 2px;
   }
-  
+
   .panel-title {
-    color: white;
-    font-weight: 600;
+    color: #ffffff;
+    font-weight: 800;
     font-size: 14px;
-    letter-spacing: 0.5px;
+    letter-spacing: 1.5px;
+    text-shadow: 0 1px 0 rgba(46, 139, 199, 0.45);
   }
-  
+
   .panel-hint {
-    color: rgba(255, 255, 255, 0.6);
+    color: rgba(255, 255, 255, 0.85);
     font-size: 11px;
   }
-  
+
   .header-right {
     display: flex;
     align-items: center;
     gap: 8px;
+    position: relative;
+    z-index: 1;
   }
-  
+
   .collapse-btn {
     width: 28px;
     height: 28px;
-    background: rgba(102, 187, 106, 0.9);
-    border: none;
-    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.25);
+    border: 2px solid rgba(255, 255, 255, 0.6);
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
+    color: #ffffff;
     cursor: pointer;
-    transition: all 0.2s ease;
-    
+    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+
     &:hover {
-      background: rgba(102, 187, 106, 1);
-      transform: scale(1.05);
+      background: #ffffff;
+      color: #4aa9ec;
+      transform: scale(1.1);
     }
-    
+
+    &:active {
+      transform: scale(0.9);
+    }
+
     .collapse-icon {
       transition: transform 0.3s ease;
-      
+
       &.is-rotated {
         transform: rotate(180deg);
       }
     }
   }
-  
+
   .drag-indicator {
-    color: rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.5);
     transition: color 0.2s;
     padding: 4px;
-    
+
     &:hover {
-      color: rgba(255, 255, 255, 0.8);
+      color: rgba(255, 255, 255, 0.9);
+    }
+  }
+
+  .header-star {
+    position: absolute;
+    color: rgba(255, 255, 255, 0.85);
+    pointer-events: none;
+    animation: twinkle 2.2s ease-in-out infinite;
+
+    &.s1 {
+      right: 86px;
+      top: 8px;
+      font-size: 11px;
+    }
+
+    &.s2 {
+      right: 130px;
+      bottom: 12px;
+      font-size: 9px;
+      animation-delay: 0.8s;
     }
   }
 }
 
+@keyframes mascot-bounce {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  30% { transform: translateY(-4px) rotate(-6deg); }
+  60% { transform: translateY(1px) rotate(4deg); }
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.35; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
 .panel-content {
-  padding: 14px 16px;
+  padding: 12px 14px;
   max-height: min(800px, 80vh);
   overflow-y: auto;
-  
+
   &::-webkit-scrollbar {
-    width: 4px;
+    width: 8px;
   }
-  
+
   &::-webkit-scrollbar-track {
     background: transparent;
   }
-  
+
   &::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.15);
-    border-radius: 4px;
-    
+    background: #bfe3f9;
+    border-radius: 8px;
+    border: 2px solid #f7fbff;
+
     &:hover {
-      background: rgba(0, 0, 0, 0.25);
+      background: #9cd3f5;
     }
   }
 }
@@ -404,17 +470,16 @@ onUnmounted(() => {
   .section-label {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-bottom: 12px;
-    padding: 0 4px;
-    color: #606266;
+    gap: 6px;
+    margin-bottom: 10px;
+    padding: 0 2px;
+    color: $ink;
     font-size: 12px;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    
-    svg {
-      opacity: 0.6;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+
+    .section-emoji {
+      font-size: 14px;
     }
   }
 }
@@ -424,89 +489,96 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 32px 16px;
-  color: #909399;
+  gap: 10px;
+  padding: 28px 16px;
+  color: $sub-ink;
   font-size: 13px;
-  
-  svg {
-    opacity: 0.4;
+
+  .empty-emoji {
+    font-size: 32px;
+    opacity: 0.8;
   }
 }
 
 .type-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 6px;
+  gap: 8px;
 }
 
 .type-button {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  background: #f5f7fa;
-  border-radius: 10px;
+  gap: 10px;
+  padding: 9px 10px;
+  background: #ffffff;
+  border: 2px solid #e3eef8;
+  border-radius: 14px;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
   overflow: hidden;
-  
+
   &:hover {
-    background: #ecf5ff;
-    transform: translateX(4px);
-    
-    .type-color-bar {
-      width: 4px;
-    }
-    
+    background: color-mix(in srgb, var(--type-color) 8%, #ffffff);
+    border-color: var(--type-color);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 0 color-mix(in srgb, var(--type-color) 30%, #ffffff);
+
     .type-check {
       opacity: 1;
       transform: scale(1);
     }
   }
-  
+
   &:active {
-    transform: translateX(4px) scale(0.98);
+    transform: translateY(1px);
+    box-shadow: none;
   }
-  
+
   .type-color-bar {
     position: absolute;
     left: 0;
     top: 0;
     bottom: 0;
-    width: 3px;
+    width: 4px;
     background: var(--type-color);
-    border-radius: 10px 0 0 10px;
-    transition: width 0.25s ease;
+    border-radius: 0 4px 4px 0;
   }
-  
+
   .type-info {
     flex: 1;
     display: flex;
     align-items: center;
-    gap: 10px;
-    
-    &::before {
-      content: '';
-      width: 10px;
-      height: 10px;
+    gap: 8px;
+    min-width: 0;
+
+    .type-dot {
+      width: 11px;
+      height: 11px;
       background: var(--type-color);
-      border-radius: 3px;
+      border: 2px solid #ffffff;
+      box-shadow: 0 0 0 1.5px var(--type-color);
+      border-radius: 50%;
       flex-shrink: 0;
     }
   }
-  
+
   .type-name {
-    font-size: 13px;
-    color: #303133;
-    font-weight: 500;
+    font-size: 12.5px;
+    color: $ink;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
-  
+
   .type-check {
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
     background: var(--type-color);
+    border: 2px solid #ffffff;
+    box-shadow: 0 2px 0 color-mix(in srgb, var(--type-color) 60%, #3d5a73);
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -515,6 +587,7 @@ onUnmounted(() => {
     opacity: 0;
     transform: scale(0.5);
     transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    flex-shrink: 0;
   }
 }
 
@@ -522,90 +595,98 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 16px;
+  margin-top: 14px;
   padding-top: 12px;
-  border-top: 1px solid rgba(30, 136, 229, 0.08);
-  
+  border-top: 2px dashed #dcecf8;
+
   .footer-stats {
     display: flex;
     flex-direction: column;
     gap: 6px;
   }
-  
+
   .stat-item {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     font-size: 12px;
-    color: #606266;
+    color: $ink;
+    font-weight: 700;
   }
-  
+
   .stat-dot {
-    width: 8px;
-    height: 8px;
+    width: 9px;
+    height: 9px;
     border-radius: 50%;
-    
+    border: 1.5px solid #ffffff;
+
     &.selected {
-      background: #409eff;
-      box-shadow: 0 0 8px rgba(64, 158, 255, 0.5);
+      background: $blue;
+      box-shadow: 0 0 0 1.5px $blue;
+      animation: dot-blink 1.6s ease-in-out infinite;
     }
-    
+
     &.pending {
-      background: #67c23a;
-      box-shadow: 0 0 8px rgba(103, 194, 58, 0.5);
+      background: $green;
+      box-shadow: 0 0 0 1.5px $green;
+      animation: dot-blink 1.6s ease-in-out infinite 0.4s;
     }
   }
-  
+
   .footer-actions {
     display: flex;
     align-items: center;
     gap: 8px;
   }
-  
+
   .cancel-btn {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 8px 14px;
-    background: linear-gradient(135deg, #909399 0%, #606266 100%);
-    color: white;
-    border: none;
-    border-radius: 8px;
+    gap: 5px;
+    padding: 8px 12px;
+    background: #ffffff;
+    color: $sub-ink;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
     font-size: 12px;
-    font-weight: 500;
+    font-weight: 700;
     cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 2px 8px rgba(144, 147, 153, 0.3);
-    
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 3px 0 #e2e8f0;
+
     .cancel-icon {
       transition: transform 0.5s ease;
     }
-    
+
     &:hover:not(:disabled) {
+      color: $ink;
+      border-color: #c9d4e0;
       transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(144, 147, 153, 0.4);
-      
+      box-shadow: 0 5px 0 #e2e8f0;
+
       .cancel-icon {
         animation: rotate-twice 1.5s ease-in-out;
       }
     }
-    
+
     &:active:not(:disabled) {
-      transform: translateY(0);
+      transform: translateY(1px);
+      box-shadow: 0 1px 0 #e2e8f0;
     }
-    
+
     &:disabled {
-      background: linear-gradient(135deg, #c0c4cc 0%, #a8abb2 100%);
+      background: #f3f5f8;
+      border-color: #e9edf2;
+      color: #b6bfca;
       box-shadow: none;
       cursor: not-allowed;
-      opacity: 0.7;
-      
+
       .cancel-icon {
         animation: none;
       }
     }
   }
-  
+
   @keyframes rotate-twice {
     0% {
       transform: rotate(0deg);
@@ -620,50 +701,57 @@ onUnmounted(() => {
       transform: rotate(720deg);
     }
   }
-  
+
   .clear-btn {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 9px 14px;
-    background: linear-gradient(135deg, #f56c6c 0%, #e64a4a 100%);
+    gap: 5px;
+    padding: 8px 12px;
+    background: linear-gradient(135deg, #f99b9b 0%, #f07474 100%);
     color: white;
-    border: none;
-    border-radius: 8px;
+    border: 2px solid #ffffff;
+    border-radius: 12px;
     font-size: 12px;
-    font-weight: 500;
+    font-weight: 700;
     cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 2px 8px rgba(245, 108, 108, 0.3);
-    
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 3px 0 $coral-dark;
+
     .trash-lid {
       transform-origin: 22px 5.5px;
       transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
-    
+
     &:hover:not(:disabled) {
       transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(245, 108, 108, 0.4);
-      
+      box-shadow: 0 5px 0 $coral-dark;
+
       .trash-lid {
         transform: rotate(50deg);
       }
     }
-    
+
     &:active:not(:disabled) {
-      transform: translateY(0);
+      transform: translateY(1px);
+      box-shadow: 0 1px 0 $coral-dark;
     }
-    
+
     &:disabled {
-      background: linear-gradient(135deg, #c0c4cc 0%, #a8abb2 100%);
+      background: #f3f5f8;
+      border-color: #e9edf2;
+      color: #b6bfca;
       box-shadow: none;
       cursor: not-allowed;
-      opacity: 0.7;
-      
+
       .trash-lid {
         transform: rotateX(0deg);
       }
     }
   }
+}
+
+@keyframes dot-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
 }
 </style>
