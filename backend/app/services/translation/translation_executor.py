@@ -7,21 +7,22 @@ import asyncio
 from typing import Dict, List, Optional, Any, Callable
 from loguru import logger
 
-from app.services.translation.deepseek_service import DeepSeekTranslationService
+from app.services.translation.llm_service import create_translation_service
 
 
 class TranslationExecutor:
     """翻译执行器类"""
     
-    def __init__(self, api_key: str, control_flags: Optional[Dict] = None):
+    def __init__(self, api_key: str, control_flags: Optional[Dict] = None, llm_config: Optional[Dict] = None):
         """
         初始化翻译执行器
         
         Args:
-            api_key: DeepSeek API Key
+            api_key: 大模型 API Key
             control_flags: 控制标志字典 {"paused": bool, "stopped": bool}
+            llm_config: 大模型配置 {"provider": str, "base_url": str, "model": str}，缺省回退 DeepSeek
         """
-        self.deepseek_service = DeepSeekTranslationService(api_key=api_key)
+        self.llm_service = create_translation_service(api_key=api_key, llm_config=llm_config)
         self.control_flags = control_flags or {"paused": False, "stopped": False}
         logger.info("翻译执行器初始化成功")
     
@@ -65,7 +66,7 @@ class TranslationExecutor:
                 }
             
             # 调用翻译服务
-            translated_text = await self.deepseek_service.translate_text_async(
+            translated_text = await self.llm_service.translate_text_async(
                 text=source_text,
                 source_lang=source_lang,
                 target_lang=target_lang,

@@ -125,19 +125,21 @@ class TranslationTaskService:
         max_concurrent: int = 5,
         enable_distribution: bool = True,
         progress_callback: Optional[callable] = None,
-        control_flags: Optional[Dict] = None  # 【新增】控制标志
+        control_flags: Optional[Dict] = None,  # 【新增】控制标志
+        llm_config: Optional[Dict] = None  # 【新增】大模型厂商配置
     ) -> Dict[str, Any]:
         """
         异步翻译整个PDF（分两阶段：翻译 + 译文分配）
         
         Args:
             pdf_name: PDF文件名
-            api_key: DeepSeek API Key
+            api_key: 大模型 API Key
             use_dps: 是否使用DPS模式
             max_concurrent: 最大并发数
             enable_distribution: 是否启用译文分配（针对组合块）
             progress_callback: 进度回调函数
             control_flags: 控制标志 {"paused": bool, "stopped": bool}
+            llm_config: 大模型配置 {"provider": str, "base_url": str, "model": str}
             
         Returns:
             翻译结果
@@ -151,10 +153,11 @@ class TranslationTaskService:
                     "error": "预翻译文件不存在，请先生成预翻译文件"
                 }
             
-            # 2. 初始化翻译执行器（【新增】传入控制标志）
+            # 2. 初始化翻译执行器（【新增】传入控制标志与大模型配置）
             translation_executor = TranslationExecutor(
                 api_key=api_key,
-                control_flags=control_flags
+                control_flags=control_flags,
+                llm_config=llm_config
             )
             
             # 3. 准备翻译任务
@@ -607,18 +610,20 @@ class TranslationTaskService:
         use_dps: bool = False,
         max_concurrent: int = 5,
         enable_distribution: bool = True,
-        progress_callback: Optional[callable] = None
+        progress_callback: Optional[callable] = None,
+        llm_config: Optional[Dict] = None
     ) -> Dict[str, Any]:
         """
         同步翻译整个PDF（内部调用异步方法）
         
         Args:
             pdf_name: PDF文件名
-            api_key: DeepSeek API Key
+            api_key: 大模型 API Key
             use_dps: 是否使用DPS模式
             max_concurrent: 最大并发数
             enable_distribution: 是否启用译文分配
             progress_callback: 进度回调函数
+            llm_config: 大模型配置 {"provider": str, "base_url": str, "model": str}
             
         Returns:
             翻译结果
@@ -644,7 +649,8 @@ class TranslationTaskService:
                             use_dps=use_dps,
                             max_concurrent=max_concurrent,
                             enable_distribution=enable_distribution,
-                            progress_callback=progress_callback
+                            progress_callback=progress_callback,
+                            llm_config=llm_config
                         )
                     )
                     return future.result()
@@ -657,7 +663,8 @@ class TranslationTaskService:
                         use_dps=use_dps,
                         max_concurrent=max_concurrent,
                         enable_distribution=enable_distribution,
-                        progress_callback=progress_callback
+                        progress_callback=progress_callback,
+                        llm_config=llm_config
                     )
                 )
         except RuntimeError:
@@ -669,7 +676,8 @@ class TranslationTaskService:
                     use_dps=use_dps,
                     max_concurrent=max_concurrent,
                     enable_distribution=enable_distribution,
-                    progress_callback=progress_callback
+                    progress_callback=progress_callback,
+                    llm_config=llm_config
                 )
             )
     

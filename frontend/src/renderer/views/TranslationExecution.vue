@@ -176,6 +176,12 @@
         </div>
       </div>
     </div>
+
+    <PdfExportDialog
+      v-model="exportDialogVisible"
+      :pdf-names="[pdfName]"
+      :use-dps="useDps"
+    />
   </div>
 </template>
 
@@ -183,6 +189,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button1 from '../elements/button/button1.vue'
+import PdfExportDialog from '../components/PdfExportDialog.vue'
 import { 
   generatePretranslation, 
   startTranslation, 
@@ -194,9 +201,7 @@ import {
   stopTranslation,
   getPDFPageImage,
   getPDFParsedData,
-  getPDFDpsData,
-  exportPDF,
-  getExportDownloadUrl
+  getPDFDpsData
 } from '../api/pdf'
 
 const route = useRoute()
@@ -209,6 +214,10 @@ const useDps = ref(route.query.useDps === 'true')
 const sourceLang = ref(route.query.sourceLang || 'en')
 const targetLang = ref(route.query.targetLang || 'zh-CN')
 const aggregateTitles = ref(route.query.aggregateTitles === 'true')
+// 大模型厂商配置（缺省时后端回退 DeepSeek）
+const llmProvider = ref(route.query.provider || '')
+const llmBaseUrl = ref(route.query.baseUrl || '')
+const llmModel = ref(route.query.model || '')
 const maxConcurrent = ref(5)
 
 const clampMaxConcurrent = (val) => {
@@ -340,6 +349,8 @@ onMounted(async () => {
     targetLang: targetLang.value,
     aggregateTitles: aggregateTitles.value,
     maxConcurrent: maxConcurrent.value,
+    provider: llmProvider.value || 'deepseek',
+    model: llmModel.value || '-',
     hasApiKey: Boolean(apiKey.value)
   })
 
@@ -919,7 +930,10 @@ const initTranslation = async () => {
       api_key: apiKey.value,
       use_dps: useDps.value,
       max_concurrent: maxConcurrent.value,
-      enable_distribution: true
+      enable_distribution: true,
+      provider: llmProvider.value || undefined,
+      base_url: llmBaseUrl.value || undefined,
+      model: llmModel.value || undefined
     })
 
     if (translateResult.code !== 200) {
@@ -1275,48 +1289,11 @@ const handleStop = async () => {
   }
 }
 
-// 导出状态
-const isExporting = ref(false)
+const exportDialogVisible = ref(false)
 
 // 导出结果
-const handleExport = async () => {
-  if (isExporting.value) {
-    return
-  }
-  
-  isExporting.value = true
-  window.$toast?.info('正在导出PDF...')
-  
-  try {
-    // 调用导出 API，默认使用 overlay 模式
-    const result = await exportPDF(pdfName.value, {
-      mode: 'overlay',
-      use_dps: useDps.value
-    })
-    
-    if (result.code === 200 && result.data) {
-      const { filename, download_url } = result.data
-      
-      window.$toast?.success('导出成功！正在下载...')
-      
-      // 触发下载
-      const downloadLink = document.createElement('a')
-      downloadLink.href = getExportDownloadUrl(filename)
-      downloadLink.download = filename
-      downloadLink.target = '_blank'
-      document.body.appendChild(downloadLink)
-      downloadLink.click()
-      document.body.removeChild(downloadLink)
-      
-    } else {
-      throw new Error(result.message || '导出失败')
-    }
-  } catch (error) {
-    console.error('导出PDF失败:', error)
-    window.$toast?.error('导出失败: ' + (error.response?.data?.message || error.message))
-  } finally {
-    isExporting.value = false
-  }
+const handleExport = () => {
+  exportDialogVisible.value = true
 }
 
 // 刷新翻译结果

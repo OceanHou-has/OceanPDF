@@ -278,15 +278,61 @@ export function generatePretranslation(pdfName, params) {
 }
 
 /**
- * 测试DeepSeek API连通性
- * @param {string} apiKey - API密钥
+ * 测试大模型 API 连通性（支持多厂商）
+ * @param {string|Object} apiKeyOrConfig - API密钥，或 {api_key, provider, base_url, model} 配置对象
  * @returns {Promise}
  */
-export function testDeepSeekAPI(apiKey) {
+export function testTranslationAPI(apiKeyOrConfig) {
+  const params = typeof apiKeyOrConfig === 'string'
+    ? { api_key: apiKeyOrConfig }
+    : {
+        api_key: apiKeyOrConfig.api_key,
+        provider: apiKeyOrConfig.provider || undefined,
+        base_url: apiKeyOrConfig.base_url || undefined,
+        model: apiKeyOrConfig.model || undefined
+      }
   return request({
     url: '/translation/test',
     method: 'post',
-    params: { api_key: apiKey }
+    params
+  })
+}
+
+// 兼容旧版调用
+export const testDeepSeekAPI = testTranslationAPI
+
+/**
+ * 获取支持的大模型厂商列表
+ * @returns {Promise}
+ */
+export function getTranslationProviders() {
+  return request({
+    url: '/translation/providers',
+    method: 'get'
+  })
+}
+
+/**
+ * 保存翻译模型配置（厂商/base_url/模型/API Key）
+ * @param {Object} data - {provider, base_url, model, api_key}
+ * @returns {Promise}
+ */
+export function saveTranslationModelConfig(data) {
+  return request({
+    url: '/translation/config/model-config',
+    method: 'post',
+    data
+  })
+}
+
+/**
+ * 获取已保存的翻译模型配置
+ * @returns {Promise}
+ */
+export function getTranslationModelConfig() {
+  return request({
+    url: '/translation/config/model-config',
+    method: 'get'
   })
 }
 
@@ -312,6 +358,9 @@ export function getPretranslationTasks(pdfName, useDps = false) {
  * @param {boolean} data.use_dps - 是否使用DPS结果
  * @param {number} data.max_concurrent - 最大并发数
  * @param {boolean} data.enable_distribution - 是否启用分布式
+ * @param {string} [data.provider] - 大模型厂商ID
+ * @param {string} [data.base_url] - OpenAI兼容接口地址
+ * @param {string} [data.model] - 模型名称
  * @returns {Promise}
  */
 export function startTranslation(data) {

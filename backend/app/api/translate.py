@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Dict
 from loguru import logger
 from pathlib import Path
 import asyncio
@@ -11,8 +11,9 @@ import uuid
 from collections import deque
 
 from app.services.translation.pretranslation_service import PretranslationService
-from app.services.translation.deepseek_service import DeepSeekTranslationService
 from app.services.translation.translation_task_service import TranslationTaskService
+from app.services.translation.llm_service import create_translation_service
+from app.services.translation.llm_providers import get_providers, get_provider
 
 router = APIRouter()
 
@@ -148,21 +149,48 @@ async def get_pretranslation(
         logger.error(f"获取预翻译文件失败: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
     
-@router.post("/translation/test")
-async def test_deepseek_connection(api_key: str = Query(..., description="DeepSeek API Key")):
+@router.get("/translation/providers")
+async def list_translation_providers():
     """
-    测试 DeepSeek API 连接
-    
+    获取支持的大模型厂商列表（含默认 base_url 与预置模型）
+    """
+    try:
+        return {
+            "code": 200,
+            "message": "获取成功",
+            "data": get_providers()
+        }
+    except Exception as e:
+        logger.error(f"获取厂商列表失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/translation/test")
+async def test_llm_connection(
+    api_key: str = Query(..., description="大模型 API Key"),
+    provider: Optional[str] = Query(None, description="厂商ID（deepseek/qwen/doubao/google/openai/moonshot/zhipu/custom）"),
+    base_url: Optional[str] = Query(None, description="OpenAI 兼容接口地址（缺省回退 DeepSeek）"),
+    model: Optional[str] = Query(None, description="模型名称（缺省回退 DeepSeek 默认模型）")
+):
+    """
+    测试大模型 API 连接（支持多厂商，优先使用轻量级 models.list 接口）
+
     Args:
-        api_key: DeepSeek API Key
-        
+        api_key: API Key
+        provider: 厂商ID
+        base_url: 接口地址
+        model: 模型名称
+
     Returns:
         测试结果
     """
     try:
-        service = DeepSeekTranslationService(api_key=api_key)
+        service = create_translation_service(
+            api_key=api_key,
+            llm_config={"provider": provider, "base_url": base_url, "model": model}
+        )
         result = service.test_connection()
-        
+
         return {
             "code": 200 if result["success"] else 500,
             "message": result["message"],
@@ -246,7 +274,9 @@ async def get_api_key():
         with open(config_file, 'r', encoding='utf-8') as f:
             config = json.load(f)
         
-        api_key = config.get("deepseek_api_key", "")
+        # 优先读取新版模型配置中的 api_key，兼容旧版 deepseek_api_key
+        model_config = config.get("model_config") or {}
+        api_key = model_config.get("api_key") or config.get("deepseek_api_key", "")
         
         return {
             "code": 200,
@@ -258,6 +288,108 @@ async def get_api_key():
         }
     except Exception as e:
         logger.error(f"获取 API Key 失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class TranslationModelConfig(BaseModel):
+    """翻译模型配置（厂商 + 接口地址 + 模型 + API Key）"""
+    provider: str = Field("deepseek", description="厂商ID")
+    base_url: Optional[str] = Field("", description="OpenAI 兼容接口地址")
+    model: Optional[str] = Field("", description="模型名称")
+    api_key: Optional[str] = Field("", description="API Key")
+
+
+def _read_translation_config_file() -> Dict:
+    """读取本地翻译配置文件"""
+    config_file = Path("storage/config/translation_config.json")
+    if config_file.exists():
+        with open(config_file, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {}
+
+
+def _write_translation_config_file(config: Dict) -> None:
+    """写入本地翻译配置文件"""
+    config_dir = Path("storage/config")
+    config_dir.mkdir(parents=True, exist_ok=True)
+    config_file = config_dir / "translation_config.json"
+    with open(config_file, 'w', encoding='utf-8') as f:
+        json.dump(config, f, ensure_ascii=False, indent=2)
+
+
+@router.post("/translation/config/model-config")
+async def save_model_config(model_config: TranslationModelConfig):
+    """
+    保存翻译模型配置（厂商 / base_url / 模型 / API Key）到本地
+    """
+    try:
+        config = _read_translation_config_file()
+
+        saved = {
+            "provider": model_config.provider or "deepseek",
+            "base_url": (model_config.base_url or "").strip(),
+            "model": (model_config.model or "").strip(),
+            "api_key": (model_config.api_key or "").strip(),
+        }
+        config["model_config"] = saved
+
+        # 向后兼容：DeepSeek 厂商同步写入旧字段
+        if saved["provider"] == "deepseek" and saved["api_key"]:
+            config["deepseek_api_key"] = saved["api_key"]
+
+        _write_translation_config_file(config)
+
+        masked_key = _mask_api_key(saved["api_key"])
+        logger.info(f"翻译模型配置已保存: provider={saved['provider']}, model={saved['model']}, key={masked_key}")
+
+        return {
+            "code": 200,
+            "message": "翻译模型配置保存成功",
+            "data": {
+                "provider": saved["provider"],
+                "base_url": saved["base_url"],
+                "model": saved["model"],
+                "masked_key": masked_key
+            }
+        }
+    except Exception as e:
+        logger.error(f"保存翻译模型配置失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/translation/config/model-config")
+async def get_model_config():
+    """
+    获取已保存的翻译模型配置（不存在时回退旧版 DeepSeek 配置）
+    """
+    try:
+        config = _read_translation_config_file()
+
+        model_config = config.get("model_config")
+        if not model_config:
+            # 兼容旧版本：仅有 deepseek_api_key 的情况
+            legacy_key = config.get("deepseek_api_key", "")
+            provider_info = get_provider("deepseek") or {}
+            model_config = {
+                "provider": "deepseek",
+                "base_url": provider_info.get("default_base_url", ""),
+                "model": provider_info.get("default_model", ""),
+                "api_key": legacy_key
+            }
+
+        return {
+            "code": 200,
+            "message": "成功",
+            "data": {
+                "provider": model_config.get("provider", "deepseek"),
+                "base_url": model_config.get("base_url", ""),
+                "model": model_config.get("model", ""),
+                "api_key": model_config.get("api_key", ""),
+                "masked_key": _mask_api_key(model_config.get("api_key", ""))
+            }
+        }
+    except Exception as e:
+        logger.error(f"获取翻译模型配置失败: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -327,10 +459,22 @@ async def get_max_concurrent():
 class TranslationRequest(BaseModel):
     """翻译请求模型"""
     pdf_name: str = Field(..., description="PDF文件名")
-    api_key: str = Field(..., description="DeepSeek API Key")
+    api_key: str = Field(..., description="大模型 API Key")
     use_dps: bool = Field(False, description="是否使用DPS解析结果")
     max_concurrent: int = Field(5, ge=1, le=20, description="最大并发数（1-20）")
     enable_distribution: bool = Field(True, description="是否启用译文分配（针对组合块）")
+    provider: Optional[str] = Field(None, description="大模型厂商ID（缺省 deepseek）")
+    base_url: Optional[str] = Field(None, description="OpenAI 兼容接口地址（缺省回退 DeepSeek）")
+    model: Optional[str] = Field(None, description="模型名称（缺省回退 DeepSeek 默认模型）")
+
+
+def _build_llm_config(request: TranslationRequest) -> Dict:
+    """从翻译请求构建大模型厂商配置"""
+    return {
+        "provider": request.provider,
+        "base_url": request.base_url,
+        "model": request.model
+    }
 
 
 @router.post("/translation/translate")
@@ -377,7 +521,8 @@ async def translate_pdf(
             api_key=request.api_key,
             use_dps=request.use_dps,
             max_concurrent=request.max_concurrent,
-            enable_distribution=request.enable_distribution
+            enable_distribution=request.enable_distribution,
+            llm_config=_build_llm_config(request)
         )
         
         if not result.get("success"):
@@ -432,7 +577,8 @@ async def translate_pdf_async(request: TranslationRequest):
         logger.info(
             f"[翻译异步] 创建任务: task_id={task_id[:8]} | pdf={request.pdf_name} | "
             f"use_dps={request.use_dps} | max_concurrent={request.max_concurrent} | "
-            f"enable_distribution={request.enable_distribution} | api_key={_mask_api_key(request.api_key)}"
+            f"enable_distribution={request.enable_distribution} | provider={request.provider or 'deepseek'} | "
+            f"model={request.model or '-'} | api_key={_mask_api_key(request.api_key)}"
         )
 
         async def run_translation():
@@ -520,7 +666,8 @@ async def translate_pdf_async(request: TranslationRequest):
                     max_concurrent=request.max_concurrent,
                     enable_distribution=request.enable_distribution,
                     progress_callback=on_progress,
-                    control_flags=translation_control_flags.get(task_id)  # 【新增】传递控制标志
+                    control_flags=translation_control_flags.get(task_id),  # 【新增】传递控制标志
+                    llm_config=_build_llm_config(request)  # 【新增】传递大模型厂商配置
                 )
 
                 record = translation_progress_store.get(task_id)

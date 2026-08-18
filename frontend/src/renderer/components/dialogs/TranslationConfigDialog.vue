@@ -8,310 +8,280 @@
     :show-close="false"
     class="translation-config-dialog"
   >
-    <!-- 自定义标题 -->
-    <div class="dialog-header">
-      <div class="header-content">
-        <svg class="header-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <path d="M12.87 15.07L10.33 12.56L10.36 12.53C12.1 10.59 13.34 8.36 14.07 6H17V4H10V2H8V4H1V5.99H12.17C11.5 7.92 10.44 9.75 9 11.35C8.07 10.32 7.3 9.19 6.69 8H4.69C5.42 9.63 6.42 11.17 7.67 12.56L2.58 17.58L4 19L9 14L12.11 17.11L12.87 15.07ZM18.5 10H16.5L12 22H14L15.12 19H19.87L21 22H23L18.5 10ZM15.88 17L17.5 12.67L19.12 17H15.88Z" fill="currentColor"/>
-        </svg>
-        <h2 class="header-title">翻译配置</h2>
-      </div>
-      <button class="close-btn" @click="handleCancel">
-        <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
-          <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-      </button>
-    </div>
-
-    <div class="config-card">
-      <div class="config-container">
-      <!-- 解析模式选择 -->
-      <div class="config-section">
-        <div class="section-header">
-          <div class="section-icon-wrapper">
-            <svg class="section-icon" width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path d="M4 6H20M4 12H20M4 18H20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-          </div>
-          <h3 class="section-title">解析模式</h3>
-          <span class="required-badge">必选</span>
-        </div>
-        <div class="config-content">
-          <div class="mode-cards">
-            <div 
-              class="mode-card"
-              :class="{ 'active': !config.useDps }"
-              @click="config.useDps = false"
-            >
-              <div class="card-icon python-icon">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-                  <path d="M9.585 11.692h4.328s2.432.039 2.432-2.35V5.391S16.714 3 11.936 3C7.362 3 7.647 3 7.647 3L7.638 5.32h4.368v.647H6.647S3 5.782 3 10.349v3.984s-.164 2.453 2.388 2.453h1.396V13.73s-.193-2.388 2.35-2.388h4.328z" stroke="currentColor" stroke-width="1.5"/>
-                  <circle cx="8.5" cy="5.5" r=".9" fill="currentColor"/>
-                </svg>
-              </div>
-              <div class="card-content">
-                <div class="card-title">
-                  <span>Python 解析</span>
-                  <span class="badge badge-success">推荐</span>
-                </div>
-                <p class="card-desc">使用人工标注结果，翻译质量更高，适合精细化翻译</p>
-              </div>
-              <div class="card-check">
-                <svg v-if="!config.useDps" width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <path d="M16.667 5L7.5 14.167 3.333 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-              </div>
-            </div>
-
-            <div 
-              class="mode-card"
-              :class="{ 'active': config.useDps }"
-              @click="config.useDps = true"
-            >
-              <div class="card-icon dps-icon">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-                  <path d="M13 10V3L4 14h7v7l9-11h-7z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-              </div>
-              <div class="card-content">
-                <div class="card-title">
-                  <span>DPS/OCR 解析</span>
-                  <span class="badge badge-info">快速</span>
-                </div>
-                <p class="card-desc">直接使用OCR识别结果，无需人工标注，快速开始</p>
-              </div>
-              <div class="card-check">
-                <svg v-if="config.useDps" width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <path d="M16.667 5L7.5 14.167 3.333 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-              </div>
-            </div>
-          </div>
-        </div>
+    <div class="cartoon-wrap">
+      <!-- 装饰气泡 -->
+      <div class="deco-bubbles" aria-hidden="true">
+        <span class="bubble b1"></span>
+        <span class="bubble b2"></span>
+        <span class="bubble b3"></span>
+        <span class="bubble b4"></span>
       </div>
 
-      <!-- 语言设置 -->
-      <div class="config-section">
-        <div class="section-header">
-          <div class="section-icon-wrapper">
-            <svg class="section-icon" width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path d="M12.87 15.07L10.33 12.56L10.36 12.53C12.1 10.59 13.34 8.36 14.07 6H17V4H10V2H8V4H1V5.99H12.17C11.5 7.92 10.44 9.75 9 11.35C8.07 10.32 7.3 9.19 6.69 8H4.69C5.42 9.63 6.42 11.17 7.67 12.56L2.58 17.58L4 19L9 14L12.11 17.11L12.87 15.07ZM18.5 10H16.5L12 22H14L15.12 19H19.87L21 22H23L18.5 10ZM15.88 17L17.5 12.67L19.12 17H15.88Z" fill="currentColor"/>
-            </svg>
-          </div>
-          <h3 class="section-title">语言设置</h3>
+      <!-- 自定义标题 -->
+      <div class="dialog-header">
+        <div class="header-deco" aria-hidden="true">
+          <span class="star s1">✦</span>
+          <span class="star s2">✧</span>
+          <span class="cloud">☁️</span>
         </div>
-        <div class="config-content">
-          <div class="lang-container">
-            <div class="lang-item">
-              <label class="lang-label">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
-                  <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" stroke="currentColor" stroke-width="2"/>
-                </svg>
-                源语言
-              </label>
-              <el-select v-model="config.sourceLang" placeholder="选择源语言" class="lang-select">
-                <el-option label="🇬🇧 英语 (English)" value="en" />
-                <el-option label="🇨🇳 中文" value="zh" />
-                <el-option label="🇯🇵 日语 (日本語)" value="ja" />
-                <el-option label="🇰🇷 韩语 (한국어)" value="ko" />
-                <el-option label="🇫🇷 法语 (Français)" value="fr" />
-                <el-option label="🇩🇪 德语 (Deutsch)" value="de" />
-                <el-option label="🇪🇸 西班牙语 (Español)" value="es" />
-              </el-select>
-            </div>
-            
-            <div class="arrow-wrapper">
-              <svg class="arrow-icon" width="32" height="32" viewBox="0 0 24 24" fill="none">
-                <path d="M5 12h14m0 0l-4-4m4 4l-4 4" stroke="url(#arrow-gradient)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <defs>
-                  <linearGradient id="arrow-gradient" x1="5" y1="12" x2="19" y2="12">
-                    <stop offset="0%" stop-color="#4facfe"/>
-                    <stop offset="100%" stop-color="#00f2fe"/>
-                  </linearGradient>
-                </defs>
-              </svg>
-            </div>
-            
-            <div class="lang-item">
-              <label class="lang-label">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" stroke="currentColor" stroke-width="2"/>
-                  <path d="M9 10h6M12 7v10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                </svg>
-                目标语言
-              </label>
-              <el-select v-model="config.targetLang" placeholder="选择目标语言" class="lang-select">
-                <el-option label="🇨🇳 中文简体" value="zh-CN" />
-                <el-option label="🇭🇰 中文繁体" value="zh-TW" />
-                <el-option label="🇬🇧 英语 (English)" value="en" />
-                <el-option label="🇯🇵 日语 (日本語)" value="ja" />
-                <el-option label="🇰🇷 韩语 (한국어)" value="ko" />
-              </el-select>
-            </div>
+        <div class="header-content">
+          <div class="mascot">🐳</div>
+          <div class="header-text">
+            <h2 class="header-title">翻译配置</h2>
+            <p class="header-subtitle">和小鲸鱼一起配置专属翻译方案吧～</p>
           </div>
         </div>
-      </div>
-
-      <!-- 高级选项 -->
-      <div class="config-section">
-        <div class="section-header">
-          <div class="section-icon-wrapper">
-            <svg class="section-icon" width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" stroke="currentColor" stroke-width="2"/>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </div>
-          <h3 class="section-title">高级选项</h3>
-          <span class="optional-badge">可选</span>
-        </div>
-        <div class="config-content">
-          <div class="option-card">
-            <div class="option-main">
-              <div class="option-info">
-                <svg class="option-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                </svg>
-                <div class="option-text">
-                  <label class="option-label">聚合标题</label>
-                  <p class="option-description">将相邻的同类型标题合并为一个翻译任务</p>
-                </div>
-              </div>
-              <el-switch v-model="config.aggregateTitles" size="large" />
-            </div>
-            <div v-if="config.aggregateTitles" class="option-warning">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path d="M12 9v4m0 4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-              </svg>
-              <span>不推荐开启，可能影响翻译质量</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="config-section">
-        <div class="section-header">
-          <div class="section-icon-wrapper">
-            <svg class="section-icon" width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2v6m0 8v6M4.93 4.93l4.24 4.24m5.66 5.66 4.24 4.24M2 12h6m8 0h6M4.93 19.07l4.24-4.24m5.66-5.66 4.24-4.24" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-          </div>
-          <h3 class="section-title">并发控制</h3>
-          <span class="optional-badge">可选</span>
-        </div>
-        <div class="config-content">
-          <div class="option-card">
-            <div class="option-main">
-              <div class="option-info">
-                <svg class="option-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <path d="M13 10V3L4 14h7v7l9-11h-7z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-                <div class="option-text">
-                  <label class="option-label">翻译并发数</label>
-                  <p class="option-description">控制同时请求大模型的任务数量，建议 3-5，过高可能触发限流</p>
-                </div>
-              </div>
-              <el-input-number v-model="config.maxConcurrent" :min="1" :max="20" :step="1" class="concurrency-input" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 翻译模型配置（待实现） -->
-      <div class="config-section disabled-section">
-        <div class="section-header">
-          <div class="section-icon-wrapper disabled">
-            <svg class="section-icon" width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" stroke="currentColor" stroke-width="2"/>
-              <path d="M12 22V12M22 10l-10 5M2 10l10 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </div>
-          <h3 class="section-title">翻译模型</h3>
-          <span class="coming-soon-badge">即将推出</span>
-        </div>
-        <div class="config-content">
-          <el-select v-model="config.translationModel" disabled placeholder="选择翻译模型" class="full-width">
-            <el-option label="OpenAI GPT-4" value="gpt-4" />
-            <el-option label="OpenAI GPT-3.5" value="gpt-3.5-turbo" />
-            <el-option label="Claude 3" value="claude-3" />
-          </el-select>
-        </div>
-      </div>
-
-      <!-- API密钥配置 -->
-      <div class="config-section">
-        <div class="section-header">
-          <div class="section-icon-wrapper">
-            <svg class="section-icon" width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
-              <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </div>
-          <h3 class="section-title">API密钥</h3>
-          <span class="required-badge">必填</span>
-        </div>
-        <div class="config-content">
-          <div class="api-key-wrapper">
-            <el-input 
-              v-model="config.apiKey" 
-              type="password" 
-              placeholder="输入DeepSeek API密钥" 
-              show-password 
-              class="api-key-input"
-              @input="handleApiKeyChange"
-            />
-            <button 
-              class="test-btn" 
-              @click="handleTestApiKey"
-              :disabled="!config.apiKey || testing"
-              :class="{ 'success': testSuccess, 'error': testError }"
-            >
-              <svg v-if="!testing && !testSuccess && !testError" width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              <span class="loading-spinner-small" v-if="testing"></span>
-              <svg v-if="testSuccess" width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              <svg v-if="testError" width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              {{ testing ? '测试中...' : (testSuccess ? '测试成功' : (testError ? '测试失败' : '测试连接')) }}
-            </button>
-          </div>
-          <p v-if="testSuccess" class="test-message success">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            API Key 有效，已保存到本地
-          </p>
-          <p v-if="testError" class="test-message error">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <path d="M12 9v4m0 4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-            {{ testErrorMessage }}
-          </p>
-        </div>
-      </div>
-    </div>
-
-      <div class="dialog-footer">
-        <button class="footer-btn btn-cancel" @click="handleCancel">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <button class="close-btn" @click="handleCancel" title="关闭">
+          <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+            <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
           </svg>
-          取消
         </button>
-        <button 
-          class="footer-btn btn-translate" 
-          @click="handleStartTranslate"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <path d="M5 12h14m-7-7l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          开始翻译
-        </button>
+      </div>
+
+      <div class="config-card">
+        <div class="config-container">
+          <!-- 解析模式选择 -->
+          <div class="config-section section-blue">
+            <div class="section-header">
+              <div class="section-icon">📖</div>
+              <h3 class="section-title">解析模式</h3>
+              <span class="badge badge-required">必选</span>
+            </div>
+            <div class="mode-cards">
+              <div
+                class="mode-card"
+                :class="{ 'active': !config.useDps }"
+                @click="config.useDps = false"
+              >
+                <div class="mode-emoji">🐍</div>
+                <div class="mode-info">
+                  <div class="mode-title">
+                    <span>Python 解析</span>
+                    <span class="tag tag-green">推荐</span>
+                  </div>
+                  <p class="mode-desc">使用人工标注结果，翻译质量更高，适合精细化翻译</p>
+                </div>
+                <div class="mode-check">
+                  <svg v-if="!config.useDps" width="16" height="16" viewBox="0 0 20 20" fill="none">
+                    <path d="M16.667 5L7.5 14.167 3.333 10" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </div>
+              </div>
+
+              <div
+                class="mode-card"
+                :class="{ 'active': config.useDps }"
+                @click="config.useDps = true"
+              >
+                <div class="mode-emoji">⚡</div>
+                <div class="mode-info">
+                  <div class="mode-title">
+                    <span>DPS/OCR 解析</span>
+                    <span class="tag tag-orange">快速</span>
+                  </div>
+                  <p class="mode-desc">直接使用OCR识别结果，无需人工标注，快速开始</p>
+                </div>
+                <div class="mode-check">
+                  <svg v-if="config.useDps" width="16" height="16" viewBox="0 0 20 20" fill="none">
+                    <path d="M16.667 5L7.5 14.167 3.333 10" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 语言设置 -->
+          <div class="config-section section-green">
+            <div class="section-header">
+              <div class="section-icon">🌍</div>
+              <h3 class="section-title">语言设置</h3>
+            </div>
+            <div class="lang-container">
+              <div class="lang-item">
+                <label class="lang-label">📤 源语言</label>
+                <el-select v-model="config.sourceLang" placeholder="选择源语言" class="lang-select">
+                  <el-option label="🇬🇧 英语 (English)" value="en" />
+                  <el-option label="🇨🇳 中文" value="zh" />
+                  <el-option label="🇯🇵 日语 (日本語)" value="ja" />
+                  <el-option label="🇰🇷 韩语 (한국어)" value="ko" />
+                  <el-option label="🇫🇷 法语 (Français)" value="fr" />
+                  <el-option label="🇩🇪 德语 (Deutsch)" value="de" />
+                  <el-option label="🇪🇸 西班牙语 (Español)" value="es" />
+                </el-select>
+              </div>
+
+              <div class="swap-fish" aria-hidden="true">
+                <span class="fish">🐟</span>
+                <span class="fish-trail">〰</span>
+              </div>
+
+              <div class="lang-item">
+                <label class="lang-label">📥 目标语言</label>
+                <el-select v-model="config.targetLang" placeholder="选择目标语言" class="lang-select">
+                  <el-option label="🇨🇳 中文简体" value="zh-CN" />
+                  <el-option label="🇭🇰 中文繁体" value="zh-TW" />
+                  <el-option label="🇬🇧 英语 (English)" value="en" />
+                  <el-option label="🇯🇵 日语 (日本語)" value="ja" />
+                  <el-option label="🇰🇷 韩语 (한국어)" value="ko" />
+                </el-select>
+              </div>
+            </div>
+          </div>
+
+          <!-- 高级选项 -->
+          <div class="config-section section-purple">
+            <div class="section-header">
+              <div class="section-icon">🎛️</div>
+              <h3 class="section-title">高级选项</h3>
+              <span class="badge badge-optional">可选</span>
+            </div>
+            <div class="option-card">
+              <div class="option-main">
+                <div class="option-info">
+                  <div class="option-emoji">🧩</div>
+                  <div class="option-text">
+                    <label class="option-label">聚合标题</label>
+                    <p class="option-description">将相邻的同类型标题合并为一个翻译任务</p>
+                  </div>
+                </div>
+                <el-switch v-model="config.aggregateTitles" size="large" class="cartoon-switch" />
+              </div>
+              <div v-if="config.aggregateTitles" class="option-warning">
+                <span>🙈</span>
+                <span>不推荐开启，可能影响翻译质量哦</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 并发控制 -->
+          <div class="config-section section-orange">
+            <div class="section-header">
+              <div class="section-icon">⚡</div>
+              <h3 class="section-title">并发控制</h3>
+              <span class="badge badge-optional">可选</span>
+            </div>
+            <div class="option-card">
+              <div class="option-main">
+                <div class="option-info">
+                  <div class="option-emoji">🚀</div>
+                  <div class="option-text">
+                    <label class="option-label">翻译并发数</label>
+                    <p class="option-description">控制同时请求大模型的任务数量，建议 3-5，过高可能触发限流</p>
+                  </div>
+                </div>
+                <el-input-number v-model="config.maxConcurrent" :min="1" :max="20" :step="1" class="concurrency-input" />
+              </div>
+            </div>
+          </div>
+
+          <!-- 翻译模型配置 -->
+          <div class="config-section section-gray">
+            <div class="section-header">
+              <div class="section-icon">🤖</div>
+              <h3 class="section-title">翻译模型</h3>
+              <span class="badge badge-required">必选</span>
+            </div>
+
+            <!-- 厂商选择 -->
+            <div class="provider-grid">
+              <div
+                v-for="p in providers"
+                :key="p.id"
+                class="provider-chip"
+                :class="{ active: config.provider === p.id }"
+                @click="selectProvider(p)"
+              >
+                <span class="provider-emoji">{{ p.emoji }}</span>
+                <span class="provider-name">{{ p.name }}</span>
+              </div>
+            </div>
+            <p v-if="currentProvider && currentProvider.description" class="provider-desc">
+              🐚 {{ currentProvider.description }}
+            </p>
+
+            <!-- 模型与接口地址 -->
+            <div class="model-row">
+              <div class="model-field">
+                <label class="model-label">🧬 模型</label>
+                <el-select
+                  v-model="config.model"
+                  filterable
+                  allow-create
+                  default-first-option
+                  placeholder="选择或输入模型名称"
+                  class="full-width"
+                >
+                  <el-option v-for="m in currentModels" :key="m" :label="m" :value="m" />
+                </el-select>
+              </div>
+              <div class="model-field">
+                <label class="model-label">🔗 接口地址 (Base URL)</label>
+                <el-input
+                  v-model="config.baseUrl"
+                  placeholder="https://api.example.com/v1（选中厂商会自动填充，可手动修改）"
+                  class="full-width"
+                  @input="handleApiKeyChange"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- API密钥配置 -->
+          <div class="config-section section-pink">
+            <div class="section-header">
+              <div class="section-icon">🔑</div>
+              <h3 class="section-title">API密钥</h3>
+              <span class="badge badge-required">必填</span>
+            </div>
+            <div class="api-key-wrapper">
+              <el-input
+                v-model="config.apiKey"
+                type="password"
+                :placeholder="apiKeyPlaceholder"
+                show-password
+                class="api-key-input"
+                @input="handleApiKeyChange"
+              />
+              <button
+                class="test-btn"
+                @click="handleTestApiKey"
+                :disabled="!config.apiKey || !canTestApi || testing"
+                :class="{ 'success': testSuccess, 'error': testError }"
+              >
+                <span class="loading-spinner-small" v-if="testing"></span>
+                <template v-else>{{ testSuccess ? '🎉 测试成功' : (testError ? '😢 测试失败' : '📡 测试连接') }}</template>
+              </button>
+            </div>
+            <a
+              v-if="currentProvider && currentProvider.key_url"
+              class="key-link"
+              :href="currentProvider.key_url"
+              target="_blank"
+              rel="noopener"
+            >
+              🎫 去获取 {{ currentProvider.name }} API Key
+            </a>
+            <p v-if="testSuccess" class="test-message success">
+              <span>✅</span> API Key 有效，已保存到本地
+            </p>
+            <p v-if="testError" class="test-message error">
+              <span>⚠️</span> {{ testErrorMessage }}
+            </p>
+          </div>
+        </div>
+
+        <div class="dialog-footer">
+          <button class="footer-btn btn-cancel" @click="handleCancel">
+            取消
+          </button>
+          <button
+            class="footer-btn btn-translate"
+            :disabled="!canStartTranslate"
+            @click="handleStartTranslate"
+          >
+            开始翻译
+          </button>
+        </div>
       </div>
     </div>
   </el-dialog>
@@ -348,55 +318,179 @@ const config = ref({
   sourceLang: 'en',
   targetLang: 'zh-CN',
   aggregateTitles: false,
-  translationModel: 'gpt-4',
+  provider: 'deepseek',
+  baseUrl: 'https://api.deepseek.com',
+  model: 'deepseek-chat',
   apiKey: '',
   maxConcurrent: 5
 })
+
+// 大模型厂商列表（优先从后端加载，失败时使用内置兑底）
+const FALLBACK_PROVIDERS = [
+  {
+    id: 'deepseek', name: 'DeepSeek', emoji: '🐳',
+    description: '深度求索，学术翻译性价比高',
+    default_base_url: 'https://api.deepseek.com',
+    models: ['deepseek-chat', 'deepseek-reasoner'], default_model: 'deepseek-chat',
+    key_placeholder: '输入 DeepSeek API 密钥（sk-...）',
+    key_url: 'https://platform.deepseek.com/api_keys'
+  },
+  {
+    id: 'custom', name: '自定义 (OpenAI 兼容)', emoji: '🛠️',
+    description: '任意 OpenAI 兼容服务（如 Ollama、OneAPI、中转站等）',
+    default_base_url: '', models: [], default_model: '',
+    key_placeholder: '输入该服务的 API Key（本地服务可填任意值）', key_url: ''
+  }
+]
+const providers = ref([...FALLBACK_PROVIDERS])
+
+const currentProvider = computed(() =>
+  providers.value.find(p => p.id === config.value.provider) || null
+)
+
+const currentModels = computed(() => {
+  const list = [...((currentProvider.value && currentProvider.value.models) || [])]
+  // 保证当前已选/自定义模型也在下拉列表中
+  if (config.value.model && !list.includes(config.value.model)) {
+    list.unshift(config.value.model)
+  }
+  return list
+})
+
+const apiKeyPlaceholder = computed(() => {
+  if (currentProvider.value && currentProvider.value.key_placeholder) {
+    return currentProvider.value.key_placeholder
+  }
+  return '输入 API 密钥'
+})
+
+// 测试连接需要：API Key + 接口地址 + 模型
+const canTestApi = computed(() =>
+  Boolean(config.value.baseUrl?.trim() && config.value.model?.trim())
+)
 
 const testing = ref(false)
 const testSuccess = ref(false)
 const testError = ref(false)
 const testErrorMessage = ref('')
 
-// 监听对话框打开状态，每次打开时加载 API Key
-watch(() => props.modelValue, async (newValue) => {
-  if (newValue) {
-    // 对话框打开时加载已保存的 API Key
-    await loadSavedApiKey()
-  }
+// 与开始翻译所需参数保持一致，统一驱动按钮的可用状态和视觉样式。
+const canStartTranslate = computed(() => {
+  const apiKey = config.value.apiKey?.trim()
+  const pdfName = props.pdfName?.trim()
+  const baseUrl = config.value.baseUrl?.trim()
+  const model = config.value.model?.trim()
+  const maxConcurrent = Number(config.value.maxConcurrent)
+
+  return Boolean(
+    pdfName &&
+    apiKey &&
+    baseUrl &&
+    model &&
+    config.value.sourceLang &&
+    config.value.targetLang &&
+    Number.isFinite(maxConcurrent) &&
+    maxConcurrent >= 1 &&
+    maxConcurrent <= 20
+  )
 })
 
-// 初始化：加载保存的 API Key（首次挂载）
-onMounted(async () => {
-  if (props.modelValue) {
-    await loadSavedApiKey()
-  }
-})
+// 选择厂商：自动填充默认 base_url 与模型
+const selectProvider = (provider) => {
+  if (config.value.provider === provider.id) return
+  config.value.provider = provider.id
+  config.value.baseUrl = provider.default_base_url || ''
+  config.value.model = provider.default_model || ''
+  // 切换厂商后重置测试状态
+  testSuccess.value = false
+  testError.value = false
+  testErrorMessage.value = ''
+}
 
-// 加载已保存的 API Key
-const loadSavedApiKey = async () => {
+// 加载厂商列表
+const loadProviders = async () => {
   try {
-    const response = await axios.get('http://localhost:8000/api/v1/translation/config/api-key')
-    if (response.data.code === 200 && response.data.data.api_key) {
-      config.value.apiKey = response.data.data.api_key
-      console.log('加载已保存的 API Key:', response.data.data.masked_key)
+    const response = await axios.get('http://localhost:8000/api/v1/translation/providers')
+    if (response.data.code === 200 && Array.isArray(response.data.data) && response.data.data.length) {
+      providers.value = response.data.data
     }
   } catch (error) {
-    console.log('未找到已保存的 API Key')
+    console.log('加载厂商列表失败，使用内置列表')
   }
 }
 
-// API Key 变化时重置测试状态
+// 监听对话框打开状态：重置配置后加载已保存的模型配置
+watch(() => props.modelValue, async (newValue, oldValue) => {
+  if (newValue) {
+    resetConfig()
+    await Promise.all([loadProviders(), loadSavedModelConfig()])
+  } else if (oldValue === true && newValue === false) {
+    emit('dialog-closed')
+  }
+})
+
+// 初始化：首次挂载且已打开时加载
+onMounted(async () => {
+  if (props.modelValue) {
+    resetConfig()
+    await Promise.all([loadProviders(), loadSavedModelConfig()])
+  }
+})
+
+// 重置配置为默认值
+const resetConfig = () => {
+  config.value = {
+    useDps: false,
+    sourceLang: 'en',
+    targetLang: 'zh-CN',
+    aggregateTitles: false,
+    provider: 'deepseek',
+    baseUrl: 'https://api.deepseek.com',
+    model: 'deepseek-chat',
+    apiKey: '',
+    maxConcurrent: 5
+  }
+  testSuccess.value = false
+  testError.value = false
+  testErrorMessage.value = ''
+}
+
+// 加载已保存的翻译模型配置（厂商/base_url/模型/API Key）
+const loadSavedModelConfig = async () => {
+  try {
+    const response = await axios.get('http://localhost:8000/api/v1/translation/config/model-config')
+    if (response.data.code === 200 && response.data.data) {
+      const saved = response.data.data
+      if (saved.provider) config.value.provider = saved.provider
+      if (saved.base_url) config.value.baseUrl = saved.base_url
+      if (saved.model) config.value.model = saved.model
+      if (saved.api_key) config.value.apiKey = saved.api_key
+      console.log('加载已保存的翻译模型配置:', saved.provider, saved.model, saved.masked_key)
+    }
+  } catch (error) {
+    console.log('未找到已保存的翻译模型配置')
+  }
+}
+
+// 配置变化时重置测试状态
 const handleApiKeyChange = () => {
   testSuccess.value = false
   testError.value = false
   testErrorMessage.value = ''
 }
 
-// 测试 API Key
+// 测试 API 连接
 const handleTestApiKey = async () => {
   if (!config.value.apiKey || !config.value.apiKey.trim()) {
     window.$toast?.warning('请先输入 API Key')
+    return
+  }
+  if (!config.value.baseUrl?.trim()) {
+    window.$toast?.warning('请填写接口地址 (Base URL)')
+    return
+  }
+  if (!config.value.model?.trim()) {
+    window.$toast?.warning('请选择或输入模型名称')
     return
   }
 
@@ -406,13 +500,16 @@ const handleTestApiKey = async () => {
   testErrorMessage.value = ''
 
   try {
-    // 测试连接
+    // 测试连接（携带厂商/接口地址/模型）
     const response = await axios.post(
       'http://localhost:8000/api/v1/translation/test',
       null,
       {
         params: {
-          api_key: config.value.apiKey
+          api_key: config.value.apiKey,
+          provider: config.value.provider,
+          base_url: config.value.baseUrl.trim(),
+          model: config.value.model.trim()
         }
       }
     )
@@ -420,9 +517,9 @@ const handleTestApiKey = async () => {
     if (response.data.code === 200 && response.data.data.success) {
       testSuccess.value = true
       window.$toast?.success('API Key 验证成功')
-      
-      // 测试成功后保存 API Key
-      await saveApiKey()
+
+      // 测试成功后保存完整模型配置
+      await saveModelConfig()
     } else {
       testError.value = true
       testErrorMessage.value = response.data.message || 'API Key 无效'
@@ -437,24 +534,24 @@ const handleTestApiKey = async () => {
   }
 }
 
-// 保存 API Key
-const saveApiKey = async () => {
+// 保存翻译模型配置到后端
+const saveModelConfig = async () => {
   try {
     const response = await axios.post(
-      'http://localhost:8000/api/v1/translation/config/api-key',
-      null,
+      'http://localhost:8000/api/v1/translation/config/model-config',
       {
-        params: {
-          api_key: config.value.apiKey
-        }
+        provider: config.value.provider,
+        base_url: config.value.baseUrl.trim(),
+        model: config.value.model.trim(),
+        api_key: config.value.apiKey.trim()
       }
     )
 
     if (response.data.code === 200) {
-      console.log('API Key 已保存:', response.data.data.masked_key)
+      console.log('翻译模型配置已保存:', response.data.data)
     }
   } catch (error) {
-    console.error('保存 API Key 失败:', error)
+    console.error('保存翻译模型配置失败:', error)
   }
 }
 
@@ -465,7 +562,15 @@ const handleCancel = () => {
 
 const handleStartTranslate = async () => {
   if (!config.value.apiKey || !config.value.apiKey.trim()) {
-    window.$toast?.warning('请先输入DeepSeek API密钥')
+    window.$toast?.warning('请先输入 API 密钥')
+    return
+  }
+  if (!config.value.model?.trim()) {
+    window.$toast?.warning('请选择或输入翻译模型')
+    return
+  }
+  if (!config.value.baseUrl?.trim()) {
+    window.$toast?.warning('请填写接口地址 (Base URL)')
     return
   }
 
@@ -474,9 +579,12 @@ const handleStartTranslate = async () => {
     return
   }
 
+  // 开始前静默保存一次配置（无需测试成功也可保存）
+  saveModelConfig()
+
   // 关闭对话框并跳转到翻译执行页面
   dialogVisible.value = false
-  
+
   router.push({
     path: '/translation',
     query: {
@@ -486,29 +594,13 @@ const handleStartTranslate = async () => {
       sourceLang: config.value.sourceLang,
       targetLang: config.value.targetLang,
       aggregateTitles: config.value.aggregateTitles,
-      maxConcurrent: config.value.maxConcurrent
+      maxConcurrent: config.value.maxConcurrent,
+      provider: config.value.provider,
+      baseUrl: config.value.baseUrl.trim(),
+      model: config.value.model.trim()
     }
   })
 }
-
-// 重置配置
-watch(dialogVisible, (newVal, oldVal) => {
-  if (newVal) {
-    // 打开时重置配置
-    config.value = {
-      useDps: false,
-      sourceLang: 'en',
-      targetLang: 'zh-CN',
-      aggregateTitles: false,
-      translationModel: 'gpt-4',
-      apiKey: '',
-      maxConcurrent: 5
-    }
-  } else if (oldVal === true && newVal === false) {
-    // 关闭时触发关闭事件
-    emit('dialog-closed')
-  }
-})
 
 onUnmounted(() => {
   // 清理逻辑（如需）
@@ -516,154 +608,257 @@ onUnmounted(() => {
 </script>
 
 <style scoped lang="scss">
-.translation-config-dialog {
-  :deep(.el-dialog) {
-    background: transparent;
-    border-radius: 0;
-    box-shadow: none;
-    padding: 0;
-    overflow: visible;
-    border: none;
-    margin: 0;
-    outline: none;
-  }
+// ===== 卡通海洋风配色 =====
+$ink: #3d5a73;          // 主文字色
+$sub-ink: #8aa2b8;      // 次要文字
+$blue: #58b6f0;         // 主蓝
+$blue-dark: #2e8bc7;    // 深蓝（立体阴影）
+$green: #6fce93;
+$orange: #ffb45d;
+$pink: #ff9eb5;
+$purple: #b3a4f3;
+$yellow: #ffd97d;
+$line: #e8f1f8;         // 浅描边
 
-  :deep(.el-overlay) {
-    background-color: rgba(0, 0, 0, 0.5);
-  }
+.cartoon-wrap {
+  position: relative;
+  background:
+    radial-gradient(circle at 20% 15%, #eaf7ff 0 2px, transparent 2px),
+    radial-gradient(circle at 70% 40%, #eaf7ff 0 2px, transparent 2px),
+    radial-gradient(circle at 45% 80%, #eaf7ff 0 2px, transparent 2px),
+    linear-gradient(180deg, #fdfeff 0%, #f4fbff 100%);
+  background-size: 90px 90px, 120px 120px, 100px 100px, 100% 100%;
+  border-radius: 28px;
+  border: 3px solid #cfe9fb;
+  box-shadow: 0 12px 0 rgba(88, 182, 240, 0.16), 0 24px 60px rgba(46, 90, 122, 0.25);
+  overflow: hidden;
+  animation: pop-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
 
-  :deep(.el-dialog__body) {
-    padding: 0;
-    background: transparent;
-    backdrop-filter: blur(10px);
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(16px);
   }
-
-  :deep(.el-dialog__footer) {
-    padding: 0;
-    background: transparent;
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
   }
 }
 
-// 自定义标题
+// 装饰气泡
+.deco-bubbles {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+
+  .bubble {
+    position: absolute;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.9), rgba(160, 216, 248, 0.35));
+    border: 2px solid rgba(140, 205, 245, 0.4);
+    animation: bubble-float 5s ease-in-out infinite;
+  }
+
+  .b1 { width: 18px; height: 18px; right: 90px; top: 96px; animation-delay: 0s; }
+  .b2 { width: 10px; height: 10px; right: 60px; top: 150px; animation-delay: 1.2s; }
+  .b3 { width: 14px; height: 14px; left: 34px; bottom: 80px; animation-delay: 0.6s; }
+  .b4 { width: 8px; height: 8px; left: 70px; bottom: 140px; animation-delay: 2s; }
+}
+
+@keyframes bubble-float {
+  0%, 100% { transform: translateY(0); opacity: 0.8; }
+  50% { transform: translateY(-10px); opacity: 1; }
+}
+
+// ===== 头部 =====
 .dialog-header {
-  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-  padding: 10px 20px;
+  position: relative;
+  background: linear-gradient(135deg, #6fc7f5 0%, #4aa9ec 100%);
+  padding: 18px 22px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  position: relative;
   overflow: hidden;
-  border-radius: 20px;
-  margin: 12px 12px 0 12px;
-  box-shadow: 0 4px 20px rgba(79, 172, 254, 0.3);
+
+  &::after {
+    // 卡通波浪底边
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 14px;
+    background:
+      radial-gradient(circle at 10px -4px, transparent 0 12px, #fdfeff 12px) 0 0 / 28px 14px repeat-x;
+  }
+
+  .header-deco {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+
+    .star {
+      position: absolute;
+      color: rgba(255, 255, 255, 0.9);
+      animation: twinkle 2.2s ease-in-out infinite;
+    }
+
+    .s1 { right: 130px; top: 12px; font-size: 14px; }
+    .s2 { right: 70px; top: 34px; font-size: 10px; animation-delay: 0.8s; }
+
+    .cloud {
+      position: absolute;
+      right: 160px;
+      bottom: 10px;
+      font-size: 20px;
+      opacity: 0.75;
+      animation: cloud-drift 7s ease-in-out infinite;
+    }
+  }
 
   .header-content {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 14px;
     position: relative;
     z-index: 1;
   }
 
-  .header-icon {
-    width: 20px;
-    height: 20px;
-    color: white;
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 6px;
-    padding: 3px;
-    backdrop-filter: blur(10px);
+  .mascot {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.95);
+    border: 3px solid #ffffff;
+    box-shadow: 0 4px 0 rgba(46, 139, 199, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 30px;
+    animation: mascot-bounce 2.6s ease-in-out infinite;
   }
 
-  .header-title {
-    font-size: 16px;
-    font-weight: 600;
-    color: white;
-    margin: 0;
-    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  .header-text {
+    .header-title {
+      font-size: 19px;
+      font-weight: 800;
+      color: #ffffff;
+      margin: 0;
+      letter-spacing: 2px;
+      text-shadow: 0 2px 0 rgba(46, 139, 199, 0.45);
+    }
+
+    .header-subtitle {
+      margin: 3px 0 0;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.9);
+      letter-spacing: 0.5px;
+    }
   }
 
   .close-btn {
-    background: rgba(255, 255, 255, 0.2);
-    border: none;
-    width: 24px;
-    height: 24px;
-    border-radius: 6px;
+    position: relative;
+    z-index: 1;
+    background: rgba(255, 255, 255, 0.25);
+    border: 2px solid rgba(255, 255, 255, 0.6);
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: all 0.3s ease;
-    position: relative;
-    z-index: 1;
-
-    svg {
-      stroke: white;
-    }
+    color: #ffffff;
+    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 
     &:hover {
-      background: rgba(255, 255, 255, 0.3);
-      transform: scale(1.05);
+      background: #ffffff;
+      color: #4aa9ec;
+      transform: rotate(90deg) scale(1.1);
     }
 
     &:active {
-      transform: scale(0.95);
+      transform: rotate(90deg) scale(0.9);
     }
   }
 }
 
+@keyframes mascot-bounce {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  30% { transform: translateY(-5px) rotate(-6deg); }
+  60% { transform: translateY(1px) rotate(4deg); }
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.4; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+@keyframes cloud-drift {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(12px); }
+}
+
+// ===== 主体 =====
 .config-card {
-  background: rgba(255, 255, 255, 0.98);
-  border-radius: 12px;
-  margin: 0 12px 12px 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-  overflow: hidden;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .config-container {
-  padding: 16px 20px;
+  padding: 16px 18px 4px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  max-height: 65vh;
+  gap: 14px;
+  max-height: 60vh;
   overflow-y: auto;
 
-  // 美化滚动条
   &::-webkit-scrollbar {
-    width: 6px;
+    width: 8px;
   }
 
   &::-webkit-scrollbar-track {
-    background: #f5f5f5;
-    border-radius: 3px;
+    background: transparent;
   }
 
   &::-webkit-scrollbar-thumb {
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-    border-radius: 3px;
+    background: #bfe3f9;
+    border-radius: 8px;
+    border: 2px solid #f4fbff;
 
     &:hover {
-      background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+      background: #9cd3f5;
     }
   }
 }
 
+// ===== 分区卡片 =====
 .config-section {
-  background: white;
-  border-radius: 12px;
-  padding: 16px 18px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
-  transition: all 0.3s ease;
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 14px 16px 16px;
+  border: 3px solid $line;
+  box-shadow: 0 4px 0 rgba(200, 224, 242, 0.5);
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 
   &:hover {
-    box-shadow: 0 4px 20px rgba(79, 172, 254, 0.15);
-    transform: translateY(-2px);
+    transform: translateY(-3px);
+    box-shadow: 0 7px 0 rgba(200, 224, 242, 0.5);
   }
 
+  &.section-blue   { border-color: #cfe9fb; .section-icon { background: #e3f3fe; } }
+  &.section-green  { border-color: #cdefd9; .section-icon { background: #e4f8ec; } }
+  &.section-purple { border-color: #e0dbfa; .section-icon { background: #efecfd; } }
+  &.section-orange { border-color: #ffe4c2; .section-icon { background: #fff2e0; } }
+  &.section-pink   { border-color: #ffd9e2; .section-icon { background: #ffeef2; } }
+  &.section-gray   { border-color: #e5e9f0; .section-icon { background: #f0f2f6; } }
+
   &.disabled-section {
-    opacity: 0.6;
-    background: #fafafa;
+    opacity: 0.65;
     pointer-events: none;
 
     &:hover {
@@ -672,355 +867,316 @@ onUnmounted(() => {
   }
 }
 
-.translate-progress {
-  padding: 0 32px 24px;
-  
-  :deep(.el-progress__text) {
-    font-size: 12px !important;
-    font-weight: 600;
-  }
-
-  :deep(.el-progress-bar__outer) {
-    border-radius: 5px;
-    overflow: hidden;
-  }
-
-  :deep(.el-progress-bar__inner) {
-    border-radius: 5px;
-    transition: width 0.3s ease, background-color 0.3s ease;
-  }
-}
-
-.translate-progress-text {
-  margin-top: 10px;
-  font-size: 13px;
-  color: #495057;
-  font-weight: 500;
-}
-
 .section-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
+  gap: 10px;
+  margin-bottom: 12px;
 
-  .section-icon-wrapper {
+  .section-icon {
     width: 36px;
     height: 36px;
-    border-radius: 10px;
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
+    font-size: 18px;
     flex-shrink: 0;
+    transition: transform 0.3s ease;
+  }
 
-    &.disabled {
-      background: #ddd;
-    }
-
-    .section-icon {
-      stroke: white;
-      fill: white;
-    }
+  &:hover .section-icon {
+    transform: rotate(-10deg) scale(1.1);
   }
 
   .section-title {
     font-size: 16px;
-    font-weight: 600;
-    color: #2c3e50;
+    font-weight: 700;
+    color: $ink;
     margin: 0;
     flex: 1;
+    letter-spacing: 1px;
   }
 
-  .required-badge {
-    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
-    color: white;
+  .badge {
     font-size: 11px;
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-    box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
-  }
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-weight: 700;
+    letter-spacing: 1px;
 
-  .optional-badge {
-    background: linear-gradient(135deg, #74ebd5 0%, #9face6 100%);
-    color: white;
-    font-size: 11px;
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-  }
+    &.badge-required {
+      background: #ffe9e9;
+      color: #f26d6d;
+      border: 2px solid #ffc9c9;
+    }
 
-  .coming-soon-badge {
-    background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%);
-    color: white;
-    font-size: 11px;
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
+    &.badge-optional {
+      background: #e4f8ec;
+      color: #3fae70;
+      border: 2px solid #bdebd0;
+    }
+
+    &.badge-coming {
+      background: #f0f2f6;
+      color: #9aa7b5;
+      border: 2px solid #dde3ec;
+    }
   }
 }
 
-.config-content {
-  padding-left: 48px;
-}
-
-// 模式卡片
+// ===== 解析模式卡片 =====
 .mode-cards {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
 }
 
 .mode-card {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 20px;
-  background: #f8f9fa;
-  border: 2px solid #e9ecef;
-  border-radius: 14px;
+  gap: 14px;
+  padding: 14px 16px;
+  background: #f7fbff;
+  border: 3px solid #e3eef8;
+  border-radius: 18px;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
-
-  &::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 4px;
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-    transform: scaleY(0);
-    transition: transform 0.3s ease;
-  }
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 
   &:hover {
-    background: #f0f8ff;
-    border-color: #4facfe;
-    transform: translateX(4px);
+    transform: translateY(-2px) scale(1.01);
+    border-color: #a8d8f8;
+    box-shadow: 0 5px 0 rgba(168, 216, 248, 0.35);
+  }
+
+  &:active {
+    transform: translateY(1px) scale(0.99);
+    box-shadow: none;
   }
 
   &.active {
-    background: linear-gradient(135deg, rgba(79, 172, 254, 0.1) 0%, rgba(0, 242, 254, 0.1) 100%);
-    border-color: #4facfe;
-    box-shadow: 0 4px 16px rgba(79, 172, 254, 0.25);
+    background: linear-gradient(135deg, #e9f6ff 0%, #ddf2ff 100%);
+    border-color: $blue;
+    box-shadow: 0 5px 0 rgba(88, 182, 240, 0.35);
 
-    &::before {
-      transform: scaleY(1);
+    .mode-emoji {
+      background: #ffffff;
+      border-color: $blue;
+      animation: wiggle 0.5s ease;
     }
 
-    .card-icon {
-      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-      color: white;
+    .mode-check {
+      background: $blue;
+      border-color: $blue;
+      color: #ffffff;
+      box-shadow: 0 3px 0 $blue-dark;
     }
   }
 
-  .card-icon {
-    width: 52px;
-    height: 52px;
-    border-radius: 12px;
+  .mode-emoji {
+    width: 48px;
+    height: 48px;
+    border-radius: 16px;
+    background: #ffffff;
+    border: 3px solid #e3eef8;
     display: flex;
     align-items: center;
     justify-content: center;
+    font-size: 24px;
     flex-shrink: 0;
-    transition: all 0.3s ease;
-    background: white;
-    border: 2px solid #e9ecef;
-
-    &.python-icon {
-      color: #4facfe;
-    }
-
-    &.dps-icon {
-      color: #00c9ff;
-    }
+    transition: all 0.25s ease;
   }
 
-  .card-content {
+  .mode-info {
     flex: 1;
+    min-width: 0;
 
-    .card-title {
+    .mode-title {
       display: flex;
       align-items: center;
-      gap: 10px;
-      margin-bottom: 6px;
+      gap: 8px;
+      margin-bottom: 4px;
 
       span:first-child {
-        font-size: 16px;
-        font-weight: 600;
-        color: #2c3e50;
+        font-size: 15px;
+        font-weight: 700;
+        color: $ink;
       }
 
-      .badge {
-        font-size: 11px;
-        padding: 3px 8px;
-        border-radius: 12px;
-        font-weight: 600;
-        letter-spacing: 0.5px;
+      .tag {
+        font-size: 10px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-weight: 700;
+        letter-spacing: 1px;
 
-        &.badge-success {
-          background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
-          color: #0d6832;
+        &.tag-green {
+          background: #dff6e8;
+          color: #2e9e63;
+          border: 1.5px solid #b3e8ca;
         }
 
-        &.badge-info {
-          background: linear-gradient(135deg, #ffa751 0%, #ffe259 100%);
-          color: #8b4513;
+        &.tag-orange {
+          background: #fff1dd;
+          color: #d07f1f;
+          border: 1.5px solid #ffdcab;
         }
       }
     }
 
-    .card-desc {
-      font-size: 13px;
-      color: #6c757d;
+    .mode-desc {
+      font-size: 12px;
+      color: $sub-ink;
       line-height: 1.5;
       margin: 0;
     }
   }
 
-  .card-check {
+  .mode-check {
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    border: 2px solid #ddd;
+    border: 3px solid #dbe6f0;
+    background: #ffffff;
+    color: #ffffff;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    transition: all 0.3s ease;
-
-    svg {
-      stroke: white;
-    }
-  }
-
-  &.active .card-check {
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-    border-color: #4facfe;
-    box-shadow: 0 2px 8px rgba(79, 172, 254, 0.4);
+    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 }
 
-// 语言设置
+@keyframes wiggle {
+  0%, 100% { transform: rotate(0); }
+  25% { transform: rotate(-10deg); }
+  60% { transform: rotate(8deg); }
+}
+
+// ===== 语言设置 =====
 .lang-container {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 14px;
 }
 
 .lang-item {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 
   .lang-label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 14px;
-    font-weight: 600;
-    color: #495057;
-
-    svg {
-      stroke: #4facfe;
-    }
+    font-size: 13px;
+    font-weight: 700;
+    color: $ink;
+    letter-spacing: 0.5px;
   }
 
   .lang-select {
     width: 100%;
 
     :deep(.el-input__wrapper) {
-      border-radius: 10px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-      transition: all 0.3s ease;
+      border-radius: 14px;
+      box-shadow: 0 0 0 2px #dcebf7 inset;
+      transition: box-shadow 0.25s ease;
 
       &:hover {
-        box-shadow: 0 4px 12px rgba(79, 172, 254, 0.2);
+        box-shadow: 0 0 0 2px #a8d8f8 inset;
+      }
+
+      &.is-focus {
+        box-shadow: 0 0 0 2px $blue inset;
       }
     }
   }
 }
 
-.arrow-wrapper {
+.swap-fish {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  margin-top: 22px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-top: 28px;
-  flex-shrink: 0;
+  border-radius: 50%;
+  background: #e9f6ff;
+  border: 3px solid #cfe9fb;
 
-  .arrow-icon {
-    animation: pulse 2s ease-in-out infinite;
+  .fish {
+    font-size: 20px;
+    animation: fish-swim 2.4s ease-in-out infinite;
   }
 
-  @keyframes pulse {
-    0%, 100% {
-      opacity: 0.6;
-      transform: translateX(0);
-    }
-    50% {
-      opacity: 1;
-      transform: translateX(4px);
-    }
+  .fish-trail {
+    position: absolute;
+    left: -14px;
+    font-size: 10px;
+    color: #9cd3f5;
+    animation: trail-fade 2.4s ease-in-out infinite;
   }
 }
 
-// 高级选项
-.option-card {
-  background: #f8f9fa;
-  border-radius: 12px;
-  padding: 18px;
-  border: 1px solid #e9ecef;
-  transition: all 0.3s ease;
+@keyframes fish-swim {
+  0%, 100% { transform: translateX(-3px) rotate(0); }
+  50% { transform: translateX(3px) rotate(6deg); }
+}
 
-  &:hover {
-    background: #f0f8ff;
-    border-color: #4facfe;
-  }
+@keyframes trail-fade {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 0.9; }
+}
+
+// ===== 选项卡片 =====
+.option-card {
+  background: #f9fcff;
+  border: 3px solid #eaf2fa;
+  border-radius: 16px;
+  padding: 12px 14px;
 
   .option-main {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
+    gap: 14px;
   }
 
   .option-info {
     display: flex;
     align-items: flex-start;
-    gap: 12px;
+    gap: 10px;
     flex: 1;
   }
 
-  .option-icon {
-    width: 24px;
-    height: 24px;
-    stroke: #4facfe;
+  .option-emoji {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    background: #ffffff;
+    border: 2px solid #e3eef8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
     flex-shrink: 0;
-    margin-top: 2px;
   }
 
   .option-text {
     flex: 1;
 
     .option-label {
-      font-size: 15px;
-      font-weight: 600;
-      color: #2c3e50;
-      margin-bottom: 6px;
+      font-size: 14px;
+      font-weight: 700;
+      color: $ink;
+      margin-bottom: 3px;
       display: block;
     }
 
     .option-description {
-      font-size: 13px;
-      color: #6c757d;
+      font-size: 12px;
+      color: $sub-ink;
       margin: 0;
       line-height: 1.5;
     }
@@ -1030,18 +1186,31 @@ onUnmounted(() => {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-top: 12px;
-    padding: 10px 12px;
-    background: #fff3cd;
-    border: 1px solid #ffc107;
-    border-radius: 8px;
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: #fff7e0;
+    border: 2px dashed #f5ce6b;
+    border-radius: 12px;
     font-size: 12px;
-    color: #856404;
+    color: #9a7516;
+    font-weight: 600;
+  }
+}
 
-    svg {
-      stroke: #856404;
-      flex-shrink: 0;
-    }
+// el-switch 卡通配色
+.cartoon-switch {
+  :deep(.el-switch.is-checked .el-switch__core) {
+    background-color: $purple;
+    border-color: $purple;
+  }
+}
+
+.concurrency-input {
+  flex-shrink: 0;
+
+  :deep(.el-input__wrapper) {
+    border-radius: 12px;
+    box-shadow: 0 0 0 2px #f0e3d2 inset;
   }
 }
 
@@ -1049,14 +1218,134 @@ onUnmounted(() => {
   width: 100%;
 
   :deep(.el-input__wrapper) {
-    border-radius: 10px;
+    border-radius: 14px;
   }
 }
 
-// API Key 样式
+// ===== 翻译模型（厂商/模型/Base URL）=====
+.provider-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.provider-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px 6px;
+  background: #f7fbff;
+  border: 3px solid #e3eef8;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  user-select: none;
+
+  .provider-emoji {
+    font-size: 20px;
+    line-height: 1;
+  }
+
+  .provider-name {
+    font-size: 11px;
+    font-weight: 700;
+    color: $ink;
+    text-align: center;
+    line-height: 1.2;
+    word-break: keep-all;
+  }
+
+  &:hover {
+    transform: translateY(-2px);
+    border-color: #a8d8f8;
+    box-shadow: 0 4px 0 rgba(168, 216, 248, 0.35);
+  }
+
+  &:active {
+    transform: translateY(1px);
+    box-shadow: none;
+  }
+
+  &.active {
+    background: linear-gradient(135deg, #e9f6ff 0%, #ddf2ff 100%);
+    border-color: $blue;
+    box-shadow: 0 4px 0 rgba(88, 182, 240, 0.35);
+
+    .provider-name {
+      color: $blue-dark;
+    }
+
+    .provider-emoji {
+      animation: wiggle 0.5s ease;
+    }
+  }
+}
+
+.provider-desc {
+  margin: 10px 2px 0;
+  font-size: 12px;
+  color: $sub-ink;
+  line-height: 1.5;
+}
+
+.model-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.model-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  .model-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: $ink;
+    letter-spacing: 0.5px;
+  }
+
+  .full-width {
+    :deep(.el-input__wrapper) {
+      box-shadow: 0 0 0 2px #e2e6ee inset;
+      transition: box-shadow 0.25s ease;
+
+      &:hover {
+        box-shadow: 0 0 0 2px #b9c6d8 inset;
+      }
+
+      &.is-focus {
+        box-shadow: 0 0 0 2px #9aa7c0 inset;
+      }
+    }
+  }
+}
+
+.key-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: $blue-dark;
+  text-decoration: none;
+  transition: all 0.2s ease;
+
+  &:hover {
+    color: $blue;
+    transform: translateX(2px);
+  }
+}
+
+// ===== API Key =====
 .api-key-wrapper {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   align-items: flex-start;
 }
 
@@ -1064,64 +1353,68 @@ onUnmounted(() => {
   flex: 1;
 
   :deep(.el-input__wrapper) {
-    border-radius: 10px;
+    border-radius: 14px;
+    box-shadow: 0 0 0 2px #f6dbe2 inset;
+    transition: box-shadow 0.25s ease;
+
+    &:hover {
+      box-shadow: 0 0 0 2px #f3b9c7 inset;
+    }
+
+    &.is-focus {
+      box-shadow: 0 0 0 2px $pink inset;
+    }
   }
 }
 
 .test-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 20px;
+  gap: 6px;
+  padding: 0 16px;
   height: 40px;
-  border: 2px solid #4facfe;
-  background: white;
-  color: #4facfe;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 600;
+  border: 3px solid $blue;
+  background: #ffffff;
+  color: $blue;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.3s ease;
   white-space: nowrap;
   flex-shrink: 0;
-
-  svg {
-    stroke: currentColor;
-    flex-shrink: 0;
-  }
+  box-shadow: 0 4px 0 rgba(88, 182, 240, 0.35);
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 
   &:hover:not(:disabled) {
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-    color: white;
+    background: $blue;
+    color: #ffffff;
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(79, 172, 254, 0.4);
+    box-shadow: 0 6px 0 rgba(88, 182, 240, 0.35);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(2px);
+    box-shadow: 0 1px 0 rgba(88, 182, 240, 0.35);
   }
 
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+    box-shadow: none;
   }
 
   &.success {
-    border-color: #67c23a;
-    color: #67c23a;
-    background: #f0f9ff;
-
-    &:hover {
-      background: #67c23a;
-      color: white;
-    }
+    border-color: $green;
+    color: #2e9e63;
+    background: #eefbf3;
+    box-shadow: 0 4px 0 rgba(111, 206, 147, 0.35);
   }
 
   &.error {
-    border-color: #f56c6c;
-    color: #f56c6c;
-    background: #fef0f0;
-
-    &:hover {
-      background: #f56c6c;
-      color: white;
-    }
+    border-color: #f58b8b;
+    color: #f26d6d;
+    background: #fff1f1;
+    box-shadow: 0 4px 0 rgba(245, 139, 139, 0.3);
   }
 }
 
@@ -1129,144 +1422,139 @@ onUnmounted(() => {
   display: inline-block;
   width: 14px;
   height: 14px;
-  border: 2px solid currentColor;
+  border: 2.5px solid currentColor;
   border-top-color: transparent;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .test-message {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 12px;
-  padding: 10px 14px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 500;
-
-  svg {
-    stroke: currentColor;
-    flex-shrink: 0;
-  }
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
 
   &.success {
-    background: #f0f9ff;
-    color: #67c23a;
-    border: 1px solid #b3e19d;
+    background: #eefbf3;
+    color: #2e9e63;
+    border: 2px dashed #a5e3c1;
   }
 
   &.error {
-    background: #fef0f0;
-    color: #f56c6c;
-    border: 1px solid #fbc4c4;
+    background: #fff1f1;
+    color: #f26d6d;
+    border: 2px dashed #f8bcbc;
   }
 }
 
-.concurrency-input {
-  :deep(.el-input__wrapper) {
-    border-radius: 10px;
-  }
-}
-
-// 底部按钮
+// ===== 底部按钮 =====
 .dialog-footer {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 10px;
-  padding: 12px 20px 16px;
-  background: white;
-  border-top: 1px solid #f0f0f0;
+  gap: 12px;
+  padding: 14px 18px 18px;
 }
 
 .footer-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 10px 20px;
-  border: none;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 600;
+  gap: 8px;
+  padding: 11px 24px;
+  border-radius: 16px;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 2px;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
-
-  svg {
-    width: 16px;
-    height: 16px;
-  }
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 0;
-    height: 0;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.3);
-    transform: translate(-50%, -50%);
-    transition: width 0.6s, height 0.6s;
-  }
-
-  &:hover::before {
-    width: 300px;
-    height: 300px;
-  }
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 
   &:active {
-    transform: scale(0.96);
+    transform: translateY(2px);
   }
 
   &.btn-cancel {
-    background: #f8f9fa;
-    color: #6c757d;
-    border: 1px solid #dee2e6;
-
-    svg {
-      stroke: #6c757d;
-    }
+    background: #ffffff;
+    color: $sub-ink;
+    border: 3px solid #e2e8f0;
+    box-shadow: 0 4px 0 #e2e8f0;
 
     &:hover {
-      background: #e9ecef;
-      border-color: #adb5bd;
+      color: $ink;
+      border-color: #c9d4e0;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 0 #e2e8f0;
+    }
+
+    &:active {
+      box-shadow: 0 1px 0 #e2e8f0;
     }
   }
 
   &.btn-translate {
-    background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
-    color: #495057;
-    box-shadow: 0 4px 16px rgba(168, 237, 234, 0.4);
-    opacity: 0.6;
-    cursor: not-allowed;
+    background: linear-gradient(135deg, #66c0f5 0%, #4aa9ec 100%);
+    color: #ffffff;
+    border: 3px solid #ffffff;
+    box-shadow: 0 5px 0 $blue-dark;
+    text-shadow: 0 1px 0 rgba(46, 139, 199, 0.4);
 
-    svg {
-      stroke: #495057;
+    &:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 7px 0 $blue-dark;
     }
 
-    .coming-tag {
-      font-size: 10px;
-      padding: 2px 6px;
-      background: rgba(255, 255, 255, 0.3);
-      border-radius: 8px;
-      margin-left: 4px;
+    &:active:not(:disabled) {
+      box-shadow: 0 1px 0 $blue-dark;
+    }
+
+    &:disabled {
+      background: #dde4ec;
+      color: #a6b2c0;
+      box-shadow: 0 4px 0 #cbd4de;
+      cursor: not-allowed;
+      text-shadow: none;
     }
   }
 }
 
-// 加载动画
 @keyframes spin {
   to {
     transform: rotate(360deg);
   }
+}
+</style>
+
+<!-- 非 scoped：Element Plus 会把自定义 class 直接挂在 .el-dialog 元素上，需全局覆盖其默认白色底板 -->
+<style lang="scss">
+.translation-config-dialog.el-dialog {
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+  overflow: visible;
+  border: none;
+  // 保留 Element Plus 默认定位，避免弹窗贴顶
+  margin: var(--el-dialog-margin-top, 15vh) auto 50px;
+  outline: none;
+
+  .el-dialog__header,
+  .el-dialog__footer {
+    padding: 0;
+    margin: 0;
+    background: transparent;
+  }
+
+  .el-dialog__body {
+    padding: 0;
+    background: transparent;
+  }
+}
+
+.el-overlay:has(.translation-config-dialog) {
+  background-color: rgba(46, 90, 122, 0.45);
+  backdrop-filter: blur(3px);
 }
 </style>
