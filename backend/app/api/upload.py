@@ -16,6 +16,9 @@ from app.services.dps_service import DPSService
 from app.services.annotation.annotation_service import AnnotationService
 from app.services.heading_hierarchy_service import HeadingHierarchyService
 from app.services.pdf_id_mapper import get_pdf_id_mapper
+from app.services.document_parser.layout_service import analyze_with_provider
+from app.services.document_parser.layout_paths import LOCAL_PROVIDER, is_external_provider
+from app.services.document_parser.providers import get_provider
 
 router = APIRouter()
 
@@ -105,12 +108,15 @@ def _find_uploaded_pdf_path(pdf_name: str) -> Path:
     return pdf_files[0]
 
 
-def _attach_dps_meta_to_parsed_json(parsed_json_path: Path, dps_result: dict) -> None:
+def _attach_dps_meta_to_parsed_json(parsed_json_path: Path, dps_result: dict, provider: str = LOCAL_PROVIDER) -> None:
     if not parsed_json_path.exists():
-        raise FileNotFoundError(f"解析JSON不存在，无法写入DPS元数据: {parsed_json_path}")
+        raise FileNotFoundError(f"解析JSON不存在，无法写入版面分析元数据: {parsed_json_path}")
 
     with open(parsed_json_path, "r", encoding="utf-8") as f:
         parsed_data = json.load(f)
+
+    # 记录当前生效的版面分析服务（下游读取版面结果时据此定位文件）
+    parsed_data["layout_provider"] = provider
 
     parsed_data["dps"] = {
         "success": bool(dps_result.get("success")),
@@ -123,17 +129,25 @@ def _attach_dps_meta_to_parsed_json(parsed_json_path: Path, dps_result: dict) ->
         "ocr_min_conf": dps_result.get("ocr_min_conf"),
         "ocr_return_regions": dps_result.get("ocr_return_regions"),
         "base_url": settings.DPS_SERVICE_URL,
+        "provider": provider,
+        "provider_name": dps_result.get("provider_name"),
     }
 
     with open(parsed_json_path, "w", encoding="utf-8") as f:
         json.dump(parsed_data, f, ensure_ascii=False, indent=2)
 
 @router.post("/upload")
-async def upload_pdf(file: UploadFile = File(...), with_ocr: bool = False, task_id: Optional[str] = Query(None)):
+async def upload_pdf(
+    file: UploadFile = File(...),
+    with_ocr: bool = False,
+    parser: str = Query(LOCAL_PROVIDER, description="版面分析服务ID（dps=本地DPS，其余为外部服务）"),
+    task_id: Optional[str] = Query(None),
+):
     """
     上传PDF文件并进行行级解析
     如果文件已经解析过，则返回已存在的解析结果
     支持进度推送：task_id参数用于SSE进度推送
+    parser参数：选择版面分析服务（默认本地DPS）
     """
     t_total_start = time.time()
     pdf_name = ""  # 初始化变量
@@ -142,6 +156,12 @@ async def upload_pdf(file: UploadFile = File(...), with_ocr: bool = False, task_
     if not task_id:
         task_id = str(uuid.uuid4())
     
+    # 解析服务名称（用于进度文案）
+    parser = parser or LOCAL_PROVIDER
+    use_external = is_external_provider(parser)
+    provider_meta = get_provider(parser) if use_external else None
+    parser_display_name = provider_meta["name"] if provider_meta else "本地DPS"
+    
     try:
         # 验证文件类型
         if not file.filename.endswith('.pdf'):
@@ -149,7 +169,7 @@ async def upload_pdf(file: UploadFile = File(...), with_ocr: bool = False, task_
         
         # 获取不带扩展名的文件名
         pdf_name = Path(file.filename).stem
-        logger.info(f"[上传] 开始处理: {pdf_name} | OCR={with_ocr} | TaskID={task_id[:8]}")
+        logger.info(f"[上传] 开始处理: {pdf_name} | OCR={with_ocr} | 解析服务={parser_display_name} | TaskID={task_id[:8]}")
         
         await send_progress(task_id, 5, "checking", "检查文件是否已存在")
         
@@ -158,7 +178,8 @@ async def upload_pdf(file: UploadFile = File(...), with_ocr: bool = False, task_
         pdf_id = mapper.get_or_create_id(pdf_name)
         parsed_dir = Path("storage/parsed") / pdf_id
         json_path = parsed_dir / "parsed.json"
-        dps_json_path = parsed_dir / "dps.json"
+        # 所选服务的版面结果文件（本地DPS=dps.json，外部服务={provider}.json）
+        layout_json_path = parsed_dir / "dps.json" if not use_external else parsed_dir / f"{parser}.json"
         
         if json_path.exists():
             # 已存在解析结果，读取并返回
@@ -169,19 +190,27 @@ async def upload_pdf(file: UploadFile = File(...), with_ocr: bool = False, task_
             with open(json_path, "r", encoding="utf-8") as f:
                 parsed_data = json.load(f)
 
-            if (not dps_json_path.exists()) or with_ocr:
+            # 版面结果缺失时补齐（外部服务自带文本识别，with_ocr不影响；本地DPS开OCR时也需补齐校验）
+            if (not layout_json_path.exists()) or (with_ocr and not use_external):
                 t_dps_start = time.time()
-                await send_progress(task_id, 30, "dps", "补齐DPS解析")
+                await send_progress(task_id, 30, "dps", f"补齐{parser_display_name}版面分析")
                 existing_pdf_path = _find_uploaded_pdf_path(pdf_name)
-                dps_result = await dps_service.analyze_pdf(
+                dps_result = await analyze_with_provider(
                     pdf_path=str(existing_pdf_path),
                     pdf_name=pdf_name,
+                    provider_id=parser,
                     with_ocr=with_ocr,
                     force=False,
                 )
-                _attach_dps_meta_to_parsed_json(json_path, dps_result)
-                logger.info(f"[上传] DPS补齐完成: {time.time() - t_dps_start:.2f}s")
-                await send_progress(task_id, 70, "dps", "DPS解析完成")
+                _attach_dps_meta_to_parsed_json(json_path, dps_result, provider=parser)
+                logger.info(f"[上传] 版面分析补齐完成: {time.time() - t_dps_start:.2f}s")
+                await send_progress(task_id, 70, "dps", f"{parser_display_name}解析完成")
+            elif parsed_data.get("layout_provider") != parser:
+                # 版面结果已存在但来源服务不同：切换当前生效的版面分析服务
+                parsed_data["layout_provider"] = parser
+                with open(json_path, "w", encoding="utf-8") as f:
+                    json.dump(parsed_data, f, ensure_ascii=False, indent=2)
+                logger.info(f"[上传] 切换版面分析服务: {pdf_name} -> {parser_display_name}")
 
             try:
                 t_anno_start = time.time()
@@ -213,7 +242,8 @@ async def upload_pdf(file: UploadFile = File(...), with_ocr: bool = False, task_
                     "total_pages": parsed_data.get("total_pages", 0),
                     "output_dir": str(parsed_dir),
                     "json_path": str(json_path),
-                    "dps_json_path": str(dps_json_path) if dps_json_path.exists() else None,
+                    "dps_json_path": str(layout_json_path) if layout_json_path.exists() else None,
+                    "layout_provider": parser,
                     "with_ocr": with_ocr,
                     "already_exists": True  # 标记为已存在
                 }
@@ -254,17 +284,18 @@ async def upload_pdf(file: UploadFile = File(...), with_ocr: bool = False, task_
             )
 
         t_dps_start = time.time()
-        await send_progress(task_id, 50, "dps", "DPS版面分析中")
-        dps_result = await dps_service.analyze_pdf(
+        await send_progress(task_id, 50, "dps", f"{parser_display_name}版面分析中")
+        dps_result = await analyze_with_provider(
             pdf_path=str(file_path),
             pdf_name=pdf_name,
+            provider_id=parser,
             with_ocr=with_ocr,
             force=False,
         )
-        logger.info(f"[上传] DPS分析完成: {time.time() - t_dps_start:.2f}s")
-        await send_progress(task_id, 75, "dps", "DPS分析完成")
+        logger.info(f"[上传] 版面分析完成({parser_display_name}): {time.time() - t_dps_start:.2f}s")
+        await send_progress(task_id, 75, "dps", f"{parser_display_name}分析完成")
         
-        _attach_dps_meta_to_parsed_json(Path(parse_result["json_path"]), dps_result)
+        _attach_dps_meta_to_parsed_json(Path(parse_result["json_path"]), dps_result, provider=parser)
         
         try:
             t_anno_start = time.time()
@@ -299,6 +330,7 @@ async def upload_pdf(file: UploadFile = File(...), with_ocr: bool = False, task_
                 "dps_json_path": dps_result.get("dps_json_path"),
                 "dps_req_id": dps_result.get("req_id"),
                 "dps_elapsed_sec": dps_result.get("elapsed_sec"),
+                "layout_provider": parser,
                 "with_ocr": with_ocr,
                 "already_exists": False  # 标记为新解析
             }

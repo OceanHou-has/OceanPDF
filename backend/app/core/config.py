@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     DPS_HTTP_TIMEOUT_SEC: int = 600
     DPS_HEALTH_TIMEOUT_SEC: int = 120
     DPS_HEALTH_POLL_INTERVAL_SEC: float = 1.0
+    DPS_HEALTH_MAX_ATTEMPTS: int = 3
     
     # 文件存储
     UPLOAD_DIR: str = "storage/uploads"

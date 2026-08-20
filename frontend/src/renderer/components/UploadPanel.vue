@@ -36,6 +36,27 @@
       </div>
     </el-upload>
 
+    <!-- 解析服务选择 -->
+    <div class="parser-bar">
+      <span class="parser-label">解析服务</span>
+      <el-select
+        v-model="selectedParser"
+        size="small"
+        class="parser-select"
+        :disabled="uploading"
+      >
+        <el-option label="本地DPS（默认）" value="dps" />
+        <el-option
+          v-for="p in externalParsers"
+          :key="p.id"
+          :label="`${p.emoji} ${p.name}${p.configured ? '' : '（未配置，请先去设置页配置）'}`"
+          :value="p.id"
+          :disabled="!p.configured"
+        />
+      </el-select>
+      <span v-if="selectedParser !== 'dps'" class="parser-tip">外部服务按页计费，请留意用量</span>
+    </div>
+
     <!-- 已选择文件显示 -->
     <transition name="file-list-fade">
       <div v-if="items.length > 0" class="file-info">
@@ -95,14 +116,32 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { UploadFilled, Document, Delete, Plus } from '@element-plus/icons-vue'
-import { uploadPDF } from '../api/pdf'
+import { uploadPDF, getDocumentParserStatus } from '../api/pdf'
 
 const router = useRouter()
 const uploadRef = ref(null)
 const uploading = ref(false)
+
+// 版面分析服务选择（dps=本地DPS，其余为外部服务ID）
+const selectedParser = ref('dps')
+const externalParsers = ref([])
+
+const loadParserStatus = async () => {
+  try {
+    const res = await getDocumentParserStatus()
+    const list = res?.data ?? []
+    externalParsers.value = Array.isArray(list) ? list : []
+  } catch (e) {
+    console.warn('[UploadPanel] 获取解析服务状态失败:', e)
+  }
+}
+
+onMounted(() => {
+  loadParserStatus()
+})
 
 const props = defineProps({
   parallelism: {
@@ -227,6 +266,7 @@ const uploadOne = async (item) => {
     name: item.name,
     size: item.size,
     with_ocr: item.ocrEnabled,
+    parser: selectedParser.value,
     taskId
   })
 
@@ -288,6 +328,7 @@ const uploadOne = async (item) => {
     // 阶段1: 文件上传（0-15%）
     uploadPromise = uploadPDF(item.file, {
       withOcr: item.ocrEnabled,
+      parser: selectedParser.value,  // 传递所选版面分析服务
       taskId: taskId,  // 传递taskId
       onProgress: (p) => {
         // 将上传进度映射到 0-15%
@@ -516,6 +557,36 @@ const formatFileSize = (bytes) => {
         box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
       }
     }
+  }
+}
+
+// 解析服务选择栏
+.parser-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  background: white;
+  border-radius: 10px;
+  border: 1px solid #e8ecf4;
+  box-shadow: 0 1px 4px rgba(102, 126, 234, 0.06);
+
+  .parser-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #4a5568;
+    white-space: nowrap;
+  }
+
+  .parser-select {
+    width: 260px;
+  }
+
+  .parser-tip {
+    font-size: 12px;
+    color: #e6a23c;
+    white-space: nowrap;
   }
 }
 

@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'path'
 
 let mainWindow
@@ -12,6 +12,12 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true
     }
+  })
+
+  // 外部链接用系统浏览器打开
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url)
+    return { action: 'deny' }
   })
 
   // 开发环境

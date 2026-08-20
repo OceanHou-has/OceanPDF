@@ -228,8 +228,11 @@ async def save_api_key(api_key: str = Query(..., description="DeepSeek API Key")
         else:
             config = {}
         
-        # 更新 API Key
-        config["deepseek_api_key"] = api_key
+        # 更新 API Key（若传入的是脱敏占位值则保留已有密钥，避免覆盖丢失）
+        if "***" not in api_key:
+            config["deepseek_api_key"] = api_key
+        elif not config.get("deepseek_api_key"):
+            raise HTTPException(status_code=400, detail="请重新填写完整的 API Key")
         
         # 保存配置
         with open(config_file, 'w', encoding='utf-8') as f:
@@ -325,11 +328,22 @@ async def save_model_config(model_config: TranslationModelConfig):
     try:
         config = _read_translation_config_file()
 
+        provider = model_config.provider or "deepseek"
+        api_key = (model_config.api_key or "").strip()
+
+        # 若传入的是脱敏占位值（含***），保留已保存的真实密钥（仅限同一厂商）
+        if "***" in api_key:
+            existing = config.get("model_config") or {}
+            if existing.get("provider") == provider and existing.get("api_key") and "***" not in existing["api_key"]:
+                api_key = existing["api_key"]
+            else:
+                api_key = ""
+
         saved = {
-            "provider": model_config.provider or "deepseek",
+            "provider": provider,
             "base_url": (model_config.base_url or "").strip(),
             "model": (model_config.model or "").strip(),
-            "api_key": (model_config.api_key or "").strip(),
+            "api_key": api_key,
         }
         config["model_config"] = saved
 
@@ -376,6 +390,19 @@ async def get_model_config():
                 "model": provider_info.get("default_model", ""),
                 "api_key": legacy_key
             }
+
+        # 修复历史脏数据：若密钥被脱敏占位值污染，清空并落盘，提示用户重新填写
+        dirty = False
+        if "***" in (model_config.get("api_key") or ""):
+            model_config["api_key"] = ""
+            config["model_config"] = model_config
+            dirty = True
+        if "***" in (config.get("deepseek_api_key") or ""):
+            config["deepseek_api_key"] = ""
+            dirty = True
+        if dirty:
+            _write_translation_config_file(config)
+            logger.warning("检测到脱敏占位值污染翻译配置，已清空，请重新填写 API Key")
 
         return {
             "code": 200,

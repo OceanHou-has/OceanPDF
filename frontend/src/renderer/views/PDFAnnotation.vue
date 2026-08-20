@@ -54,6 +54,13 @@
           @change="handleResultToggle"
         />
 
+        <!-- 外部解析服务来源徽章（仅当版面结果来自外部服务时显示） -->
+        <span
+          v-if="layoutSourceBadge"
+          class="layout-source-badge"
+          :title="`版面分析来源: ${layoutSourceBadge}`"
+        >{{ layoutSourceBadge }}</span>
+
         <!-- 排序模式下的手动排序按钮 -->
         <Button1
           size="small"
@@ -338,9 +345,13 @@ const dpsLabelToAnnotationType = {
   image: 'figure',
   chart:'figure',
   figure: 'figure',
+  figure_caption: 'figure_caption',
   figure_title: 'figure_caption',
   table: 'table',
+  table_caption: 'table_caption',
   table_title: 'table_caption',
+  table_footnote: 'table_footnote',
+  list: 'list',
   aside_text: 'paragraph',
   page_number: 'abandon',
   footnote: 'abandon',
@@ -425,6 +436,13 @@ const dpsPageSize = computed(() => {
   const height = typeof pageObj?.height === 'number' ? pageObj.height : null
   if (!width || !height) return null
   return { width, height }
+})
+
+// 版面分析来源徽章：外部服务时显示服务名（本地DPS不显示）
+const layoutSourceBadge = computed(() => {
+  const meta = dpsData.value?.meta
+  if (!meta || !meta.provider || meta.provider === 'dps') return ''
+  return meta.provider_name || meta.provider
 })
 
 // 排序模式下可排序的元素（只显示章节标题、段落、列表，不包括文档标题）
@@ -1548,6 +1566,20 @@ const handleTranslationDialogClosed = () => {
   flex-direction: column;
   height: 100vh;
   background: #f5f5f5;
+}
+
+// 外部解析服务来源徽章
+.layout-source-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  border-radius: 999px;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(79, 172, 254, 0.35);
 }
 
 .toolbar {

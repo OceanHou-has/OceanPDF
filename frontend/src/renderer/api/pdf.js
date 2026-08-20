@@ -5,6 +5,7 @@ import request from '../utils/request'
  * @param {File} file - PDF文件对象
  * @param {Object} options - 上传选项
  * @param {boolean} options.withOcr - 是否执行OCR
+ * @param {string} options.parser - 版面分析服务ID（dps=本地DPS，其余为外部服务，默认dps）
  * @param {string} options.taskId - 任务ID（用于SSE进度推送）
  * @param {(percent: number, progressEvent: any) => void} options.onProgress - 上传进度回调
  * @returns {Promise}
@@ -14,6 +15,7 @@ export function uploadPDF(file, options = {}) {
   formData.append('file', file)
 
   const withOcr = Boolean(options.withOcr)
+  const parser = options.parser || 'dps'
   const taskId = options.taskId || ''
   const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null
   
@@ -23,6 +25,7 @@ export function uploadPDF(file, options = {}) {
     data: formData,
     params: {
       with_ocr: withOcr,
+      parser: parser,  // 版面分析服务选择
       task_id: taskId  // 添加task_id参数
     },
     headers: {
@@ -581,5 +584,87 @@ export function getMaxConcurrent() {
   return request({
     url: '/translation/config/max-concurrent',
     method: 'get'
+  })
+}
+
+// ==================== 文档解析服务 API ====================
+
+/**
+ * 获取所有文档解析服务列表
+ * @returns {Promise}
+ */
+export function getDocumentParserProviders() {
+  return request({
+    url: '/document-parser/providers',
+    method: 'get'
+  })
+}
+
+/**
+ * 获取已保存的文档解析服务配置（密钥脱敏）
+ * @returns {Promise}
+ */
+export function getDocumentParserConfig() {
+  return request({
+    url: '/document-parser/config',
+    method: 'get'
+  })
+}
+
+/**
+ * 保存文档解析服务配置
+ * @param {string} providerId - 服务ID
+ * @param {Object} config - 配置内容
+ * @returns {Promise}
+ */
+export function saveDocumentParserConfig(providerId, config) {
+  return request({
+    url: '/document-parser/config',
+    method: 'post',
+    data: {
+      provider_id: providerId,
+      config: config
+    }
+  })
+}
+
+/**
+ * 测试文档解析服务连通性
+ * @param {string} providerId - 服务ID
+ * @param {Object} config - 配置内容（可选）
+ * @returns {Promise}
+ */
+export function testDocumentParser(providerId, config = {}) {
+  return request({
+    url: '/document-parser/test',
+    method: 'post',
+    data: {
+      provider_id: providerId,
+      config: config
+    },
+    timeout: 30000 // 测试可能需要较长时间
+  })
+}
+
+/**
+ * 获取文档解析服务配置状态
+ * @returns {Promise}
+ */
+export function getDocumentParserStatus() {
+  return request({
+    url: '/document-parser/status',
+    method: 'get'
+  })
+}
+
+/**
+ * 删除文档解析服务配置
+ * @param {string} providerId - 服务ID
+ * @returns {Promise}
+ */
+export function deleteDocumentParserConfig(providerId) {
+  return request({
+    url: `/document-parser/config/${providerId}`,
+    method: 'delete'
   })
 }

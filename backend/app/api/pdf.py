@@ -134,11 +134,9 @@ async def get_dps_data(pdf_name: str):
     获取PDF的DPS版面分析+OCR结果
     """
     try:
-        # 【优化】使用短ID获取parsed目录
-        mapper = get_pdf_id_mapper()
-        pdf_id = mapper.get_or_create_id(pdf_name)
-        parsed_dir = Path("storage/parsed") / pdf_id
-        json_path = parsed_dir / "dps.json"
+        # 按 layout_provider 定位当前生效的版面结果文件（外部服务={provider_id}.json）
+        from app.services.document_parser.layout_paths import get_layout_json_path
+        json_path = get_layout_json_path(pdf_name)
 
         import json
         with open(json_path, "r", encoding="utf-8") as f:
@@ -203,8 +201,14 @@ async def get_parsed_list():
             mtime = os.path.getmtime(json_path)
             parsed_time = datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
             
-            # 检查是否有OCR（判断dps.json是否存在且包含OCR文本）
-            dps_json_path = pdf_folder / "dps.json"
+            # 检查是否有OCR（判断当前生效的版面结果文件是否存在且包含OCR文本）
+            layout_provider = parsed_data.get("layout_provider") or "dps"
+            if layout_provider != "dps":
+                dps_json_path = pdf_folder / f"{layout_provider}.json"
+                if not dps_json_path.exists():
+                    dps_json_path = pdf_folder / "dps.json"
+            else:
+                dps_json_path = pdf_folder / "dps.json"
             has_ocr = False
             if dps_json_path.exists():
                 try:
@@ -263,6 +267,8 @@ async def get_parsed_list():
                 "has_ocr": has_ocr,
                 "has_translation": has_translation,
                 "translation_progress": translation_progress,
+                # 版面分析服务来源（dps=本地，其余为外部服务ID）
+                "layout_provider": layout_provider,
                 # 【新增】明确的状态标识
                 "translation_status": "completed" if (translation_progress and translation_progress["percentage"] >= 100) else ("in_progress" if has_translation else "none")
             })

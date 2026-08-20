@@ -789,10 +789,10 @@ class AnnotationService:
             }
 
     def get_dps_json_path(self, pdf_name: str) -> Path:
-        # 【优化】使用短ID代替长文件名作为目录名
-        mapper = get_pdf_id_mapper()
-        pdf_id = mapper.get_or_create_id(pdf_name)
-        return self.parsed_base_dir / pdf_id / "dps.json"
+        # 根据 parsed.json 中的 layout_provider 定位当前生效的版面结果文件
+        # （本地DPS=dps.json，外部服务={provider_id}.json，不存在时回退dps.json）
+        from app.services.document_parser.layout_paths import get_layout_json_path
+        return get_layout_json_path(pdf_name)
 
     def sync_reading_order_from_dps(self, pdf_name: str) -> Dict:
         """

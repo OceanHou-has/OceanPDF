@@ -48,26 +48,52 @@ class DPSService:
     async def wait_until_ready(self, need_ocr: bool) -> Dict[str, Any]:
         timeout_total = float(settings.DPS_HEALTH_TIMEOUT_SEC)
         interval = float(settings.DPS_HEALTH_POLL_INTERVAL_SEC)
+        max_attempts = int(settings.DPS_HEALTH_MAX_ATTEMPTS)
         t0 = time.monotonic()
         attempt = 0
+        last_error = ""
+        last_health: Dict[str, Any] = {}
 
         client_timeout = aiohttp.ClientTimeout(total=float(settings.DPS_HTTP_TIMEOUT_SEC))
         async with aiohttp.ClientSession(timeout=client_timeout) as session:
             while True:
                 attempt += 1
+                last_error = ""
                 try:
                     health = await self._get_health(session)
                     if self._is_ready(health, need_ocr=need_ocr):
                         return health
+                    last_health = health
                 except Exception as e:
-                    logger.warning(f"[DPS] 健康检查失败 attempt={attempt}: {str(e)}")
+                    last_error = str(e)
+                    logger.warning(f"[DPS] 健康检查失败 attempt={attempt}: {last_error}")
+
+                # 最多检查 max_attempts 次，尽快提示用户
+                if attempt >= max_attempts:
+                    break
 
                 elapsed = time.monotonic() - t0
                 if elapsed >= timeout_total:
-                    raise RuntimeError(
-                        f"DPS模型未就绪，等待超时 {timeout_total}s（need_ocr={need_ocr}，base_url={self.base_url}）"
-                    )
+                    break
                 await asyncio.sleep(interval)
+
+        elapsed = round(time.monotonic() - t0, 1)
+        if last_error:
+            raise RuntimeError(
+                f"DPS模型未就绪：无法连接DPS服务（已检查{attempt}次，耗时{elapsed}s）。"
+                f"请确认DPS服务已启动。最后错误: {last_error[:200]}"
+            )
+        not_ready = []
+        layout_status = (last_health.get("layout_status") or {}).get("status")
+        ocr_status = (last_health.get("ocr_status") or {}).get("status")
+        if layout_status != "ready":
+            not_ready.append(f"版面模型({layout_status})")
+        if need_ocr and ocr_status != "ready":
+            not_ready.append(f"OCR模型({ocr_status})")
+        raise RuntimeError(
+            f"DPS模型未就绪：{'、'.join(not_ready) or '模型加载中'}（已检查{attempt}次，耗时{elapsed}s）。"
+            f"请等待DPS服务完成模型加载后重试。"
+        )
 
     async def analyze_pdf(
         self,

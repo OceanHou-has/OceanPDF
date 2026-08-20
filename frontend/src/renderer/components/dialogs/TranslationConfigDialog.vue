@@ -19,16 +19,10 @@
 
       <!-- 自定义标题 -->
       <div class="dialog-header">
-        <div class="header-deco" aria-hidden="true">
-          <span class="star s1">✦</span>
-          <span class="star s2">✧</span>
-          <span class="cloud">☁️</span>
-        </div>
         <div class="header-content">
-          <div class="mascot">🐳</div>
           <div class="header-text">
             <h2 class="header-title">翻译配置</h2>
-            <p class="header-subtitle">和小鲸鱼一起配置专属翻译方案吧～</p>
+            <p class="header-subtitle">配置翻译模型、语言与解析参数</p>
           </div>
         </div>
         <button class="close-btn" @click="handleCancel" title="关闭">
@@ -43,7 +37,6 @@
           <!-- 解析模式选择 -->
           <div class="config-section section-blue">
             <div class="section-header">
-              <div class="section-icon">📖</div>
               <h3 class="section-title">解析模式</h3>
               <span class="badge badge-required">必选</span>
             </div>
@@ -53,7 +46,6 @@
                 :class="{ 'active': !config.useDps }"
                 @click="config.useDps = false"
               >
-                <div class="mode-emoji">🐍</div>
                 <div class="mode-info">
                   <div class="mode-title">
                     <span>Python 解析</span>
@@ -73,7 +65,6 @@
                 :class="{ 'active': config.useDps }"
                 @click="config.useDps = true"
               >
-                <div class="mode-emoji">⚡</div>
                 <div class="mode-info">
                   <div class="mode-title">
                     <span>DPS/OCR 解析</span>
@@ -93,12 +84,11 @@
           <!-- 语言设置 -->
           <div class="config-section section-green">
             <div class="section-header">
-              <div class="section-icon">🌍</div>
               <h3 class="section-title">语言设置</h3>
             </div>
             <div class="lang-container">
               <div class="lang-item">
-                <label class="lang-label">📤 源语言</label>
+                <label class="lang-label">源语言</label>
                 <el-select v-model="config.sourceLang" placeholder="选择源语言" class="lang-select">
                   <el-option label="🇬🇧 英语 (English)" value="en" />
                   <el-option label="🇨🇳 中文" value="zh" />
@@ -116,7 +106,7 @@
               </div>
 
               <div class="lang-item">
-                <label class="lang-label">📥 目标语言</label>
+                <label class="lang-label">目标语言</label>
                 <el-select v-model="config.targetLang" placeholder="选择目标语言" class="lang-select">
                   <el-option label="🇨🇳 中文简体" value="zh-CN" />
                   <el-option label="🇭🇰 中文繁体" value="zh-TW" />
@@ -131,14 +121,12 @@
           <!-- 高级选项 -->
           <div class="config-section section-purple">
             <div class="section-header">
-              <div class="section-icon">🎛️</div>
               <h3 class="section-title">高级选项</h3>
               <span class="badge badge-optional">可选</span>
             </div>
             <div class="option-card">
               <div class="option-main">
                 <div class="option-info">
-                  <div class="option-emoji">🧩</div>
                   <div class="option-text">
                     <label class="option-label">聚合标题</label>
                     <p class="option-description">将相邻的同类型标题合并为一个翻译任务</p>
@@ -147,8 +135,7 @@
                 <el-switch v-model="config.aggregateTitles" size="large" class="cartoon-switch" />
               </div>
               <div v-if="config.aggregateTitles" class="option-warning">
-                <span>🙈</span>
-                <span>不推荐开启，可能影响翻译质量哦</span>
+                <span>不推荐开启，可能影响翻译质量</span>
               </div>
             </div>
           </div>
@@ -156,14 +143,12 @@
           <!-- 并发控制 -->
           <div class="config-section section-orange">
             <div class="section-header">
-              <div class="section-icon">⚡</div>
               <h3 class="section-title">并发控制</h3>
               <span class="badge badge-optional">可选</span>
             </div>
             <div class="option-card">
               <div class="option-main">
                 <div class="option-info">
-                  <div class="option-emoji">🚀</div>
                   <div class="option-text">
                     <label class="option-label">翻译并发数</label>
                     <p class="option-description">控制同时请求大模型的任务数量，建议 3-5，过高可能触发限流</p>
@@ -177,7 +162,6 @@
           <!-- 翻译模型配置 -->
           <div class="config-section section-gray">
             <div class="section-header">
-              <div class="section-icon">🤖</div>
               <h3 class="section-title">翻译模型</h3>
               <span class="badge badge-required">必选</span>
             </div>
@@ -191,18 +175,17 @@
                 :class="{ active: config.provider === p.id }"
                 @click="selectProvider(p)"
               >
-                <span class="provider-emoji">{{ p.emoji }}</span>
                 <span class="provider-name">{{ p.name }}</span>
               </div>
             </div>
             <p v-if="currentProvider && currentProvider.description" class="provider-desc">
-              🐚 {{ currentProvider.description }}
+              {{ currentProvider.description }}
             </p>
 
             <!-- 模型与接口地址 -->
             <div class="model-row">
               <div class="model-field">
-                <label class="model-label">🧬 模型</label>
+                <label class="model-label">模型</label>
                 <el-select
                   v-model="config.model"
                   filterable
@@ -215,7 +198,7 @@
                 </el-select>
               </div>
               <div class="model-field">
-                <label class="model-label">🔗 接口地址 (Base URL)</label>
+                <label class="model-label">接口地址 (Base URL)</label>
                 <el-input
                   v-model="config.baseUrl"
                   placeholder="https://api.example.com/v1（选中厂商会自动填充，可手动修改）"
@@ -229,7 +212,6 @@
           <!-- API密钥配置 -->
           <div class="config-section section-pink">
             <div class="section-header">
-              <div class="section-icon">🔑</div>
               <h3 class="section-title">API密钥</h3>
               <span class="badge badge-required">必填</span>
             </div>
@@ -249,7 +231,7 @@
                 :class="{ 'success': testSuccess, 'error': testError }"
               >
                 <span class="loading-spinner-small" v-if="testing"></span>
-                <template v-else>{{ testSuccess ? '🎉 测试成功' : (testError ? '😢 测试失败' : '📡 测试连接') }}</template>
+                <template v-else>{{ testSuccess ? '测试成功' : (testError ? '测试失败' : '测试连接') }}</template>
               </button>
             </div>
             <a
@@ -259,13 +241,13 @@
               target="_blank"
               rel="noopener"
             >
-              🎫 去获取 {{ currentProvider.name }} API Key
+              去获取 {{ currentProvider.name }} API Key
             </a>
             <p v-if="testSuccess" class="test-message success">
-              <span>✅</span> API Key 有效，已保存到本地
+              API Key 有效，已保存到本地
             </p>
             <p v-if="testError" class="test-message error">
-              <span>⚠️</span> {{ testErrorMessage }}
+              {{ testErrorMessage }}
             </p>
           </div>
         </div>
@@ -320,18 +302,18 @@ const config = ref({
   aggregateTitles: false,
   provider: 'deepseek',
   baseUrl: 'https://api.deepseek.com',
-  model: 'deepseek-chat',
+  model: 'deepseek-v4-flash',
   apiKey: '',
   maxConcurrent: 5
 })
 
-// 大模型厂商列表（优先从后端加载，失败时使用内置兑底）
+// 大模型厂商列表（优先从后端加载，失败时使用内置兑底，需与后端 llm_providers.py 保持一致）
 const FALLBACK_PROVIDERS = [
   {
     id: 'deepseek', name: 'DeepSeek', emoji: '🐳',
-    description: '深度求索，学术翻译性价比高',
+    description: '深度求索，学术翻译性价比高（V4 系列）',
     default_base_url: 'https://api.deepseek.com',
-    models: ['deepseek-chat', 'deepseek-reasoner'], default_model: 'deepseek-chat',
+    models: ['deepseek-v4-flash', 'deepseek-v4-pro'], default_model: 'deepseek-v4-flash',
     key_placeholder: '输入 DeepSeek API 密钥（sk-...）',
     key_url: 'https://platform.deepseek.com/api_keys'
   },
@@ -407,16 +389,20 @@ const selectProvider = (provider) => {
   testErrorMessage.value = ''
 }
 
-// 加载厂商列表
+// 加载厂商列表（返回是否从后端成功加载，供模型校验判断能否信任列表）
+const providersFromBackend = ref(false)
 const loadProviders = async () => {
   try {
     const response = await axios.get('http://localhost:8000/api/v1/translation/providers')
     if (response.data.code === 200 && Array.isArray(response.data.data) && response.data.data.length) {
       providers.value = response.data.data
+      providersFromBackend.value = true
+      return
     }
   } catch (error) {
     console.log('加载厂商列表失败，使用内置列表')
   }
+  providersFromBackend.value = false
 }
 
 // 监听对话框打开状态：重置配置后加载已保存的模型配置
@@ -424,6 +410,8 @@ watch(() => props.modelValue, async (newValue, oldValue) => {
   if (newValue) {
     resetConfig()
     await Promise.all([loadProviders(), loadSavedModelConfig()])
+    // 加载完成后校验模型有效性，若已下线则回退到厂商默认
+    validateCurrentModel()
   } else if (oldValue === true && newValue === false) {
     emit('dialog-closed')
   }
@@ -434,6 +422,7 @@ onMounted(async () => {
   if (props.modelValue) {
     resetConfig()
     await Promise.all([loadProviders(), loadSavedModelConfig()])
+    validateCurrentModel()
   }
 })
 
@@ -446,7 +435,7 @@ const resetConfig = () => {
     aggregateTitles: false,
     provider: 'deepseek',
     baseUrl: 'https://api.deepseek.com',
-    model: 'deepseek-chat',
+    model: 'deepseek-v4-flash',
     apiKey: '',
     maxConcurrent: 5
   }
@@ -455,20 +444,39 @@ const resetConfig = () => {
   testErrorMessage.value = ''
 }
 
-// 加载已保存的翻译模型配置（厂商/base_url/模型/API Key）
+// 校验当前模型是否在厂商模型列表中，若已下线则回退到厂商默认
+// 注意：厂商列表未从后端成功加载时不可信，跳过校验避免误把用户已保存的模型回退丢失
+const validateCurrentModel = () => {
+  if (!providersFromBackend.value) return
+  const provider = providers.value.find(p => p.id === config.value.provider)
+  if (provider?.models?.length && config.value.model && !provider.models.includes(config.value.model)) {
+    console.log(`模型 ${config.value.model} 已不在 ${provider.name} 列表中，回退到默认 ${provider.default_model}`)
+    config.value.model = provider.default_model || ''
+  }
+}
+
+// 加载已保存的翻译模型配置（厂商/base_url/模型/API Key/并发数）
 const loadSavedModelConfig = async () => {
   try {
-    const response = await axios.get('http://localhost:8000/api/v1/translation/config/model-config')
-    if (response.data.code === 200 && response.data.data) {
-      const saved = response.data.data
+    const [modelRes, concurrentRes] = await Promise.all([
+      axios.get('http://localhost:8000/api/v1/translation/config/model-config'),
+      axios.get('http://localhost:8000/api/v1/translation/config/max-concurrent').catch(() => null)
+    ])
+    if (modelRes.data.code === 200 && modelRes.data.data) {
+      const saved = modelRes.data.data
       if (saved.provider) config.value.provider = saved.provider
       if (saved.base_url) config.value.baseUrl = saved.base_url
       if (saved.model) config.value.model = saved.model
       if (saved.api_key) config.value.apiKey = saved.api_key
       console.log('加载已保存的翻译模型配置:', saved.provider, saved.model, saved.masked_key)
     }
+    if (concurrentRes?.data?.code === 200 && concurrentRes.data.data) {
+      const mc = concurrentRes.data.data.max_concurrent
+      if (mc && mc >= 1 && mc <= 20) config.value.maxConcurrent = mc
+      console.log('加载已保存的并发数:', mc)
+    }
   } catch (error) {
-    console.log('未找到已保存的翻译模型配置')
+    console.log('未找到已保存的翻译配置')
   }
 }
 
@@ -1231,22 +1239,16 @@ $line: #e8f1f8;         // 浅描边
 
 .provider-chip {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 10px 6px;
+  padding: 8px 10px;
   background: #f7fbff;
   border: 3px solid #e3eef8;
   border-radius: 14px;
   cursor: pointer;
   transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
   user-select: none;
-
-  .provider-emoji {
-    font-size: 20px;
-    line-height: 1;
-  }
 
   .provider-name {
     font-size: 11px;
@@ -1277,9 +1279,7 @@ $line: #e8f1f8;         // 浅描边
       color: $blue-dark;
     }
 
-    .provider-emoji {
-      animation: wiggle 0.5s ease;
-    }
+    // provider-emoji removed
   }
 }
 

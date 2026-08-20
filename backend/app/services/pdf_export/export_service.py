@@ -90,11 +90,15 @@ class PDFExportService:
             if direct_pdf.exists():
                 source_pdf = direct_pdf
         
+        # 版面分析结果按 layout_provider 定位（外部服务={provider_id}.json，回退dps.json）
+        from app.services.document_parser.layout_paths import get_layout_json_path
+        dps_json = get_layout_json_path(pdf_name, parsed_base_dir=str(self.parsed_base_dir))
+        
         return {
             "source_pdf": source_pdf,
             "parsed_dir": parsed_dir,
             "parsed_json": parsed_dir / "parsed.json",
-            "dps_json": parsed_dir / "dps.json",
+            "dps_json": dps_json,
             "translation_json": parsed_dir / "translation.json",
             "translation_dps_json": parsed_dir / "translation_dps.json",
             "pretranslation_json": parsed_dir / "pretranslation.json",
