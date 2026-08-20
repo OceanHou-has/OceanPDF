@@ -74,6 +74,15 @@ tmp/
 backend/test_outputs/
 
 # =========================
+# 桌面端打包产物（packaging/ 下的脚本和文档需要入库，产物不入库）
+# =========================
+packaging/output/
+packaging/release/
+packaging/buildResources/icon.ico
+frontend/dist-electron/
+frontend/out/
+
+# =========================
 # OS
 # =========================
 .DS_Store

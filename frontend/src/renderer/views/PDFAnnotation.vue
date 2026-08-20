@@ -1126,7 +1126,7 @@ const loadPageImage = async () => {
   loading.value = true
   try {
     const response = await axios.get(
-      `http://localhost:8000/api/v1/pdf/${pdfName.value}/page/${currentPage.value}`
+      `http://127.0.0.1:8000/api/v1/pdf/${pdfName.value}/page/${currentPage.value}`
     )
     
     if (response.data.code === 200) {
@@ -1151,7 +1151,7 @@ const loadParsedData = async () => {
   try {
     console.log('[PDFAnnotation] 开始加载Python解析数据:', { pdfName: pdfName.value })
     const response = await axios.get(
-      `http://localhost:8000/api/v1/pdf/${pdfName.value}/parsed`
+      `http://127.0.0.1:8000/api/v1/pdf/${pdfName.value}/parsed`
     )
     
     if (response.data.code === 200) {

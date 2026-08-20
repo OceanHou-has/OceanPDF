@@ -206,10 +206,18 @@ async def test_huawei(ak: str, sk: str, endpoint: str = None) -> Dict[str, Any]:
                 if resp.status == 201:
                     return _result(True, "连接成功，IAM Token 获取正常", (time.monotonic() - t0) * 1000)
                 else:
-                    data = await resp.json()
-                    error = data.get("error", {})
-                    msg = error.get("message", f"HTTP {resp.status}")
-                    return _result(False, f"认证失败: {msg}", (time.monotonic() - t0) * 1000)
+                    try:
+                        data = await resp.json()
+                        error = data.get("error", {})
+                        msg = error.get("message", f"HTTP {resp.status}") if isinstance(error, dict) else str(error)
+                    except Exception:
+                        msg = f"HTTP {resp.status}"
+                    # 401 或错误信息明确指向凭证问题才算认证失败；
+                    # 其他业务错误（如参数/项目ID缺失）说明服务已连通
+                    low = str(msg).lower()
+                    if resp.status == 401 or any(k in low for k in ("credential", "invalid", "auth", "unauthorized")):
+                        return _result(False, f"认证失败: {msg}", (time.monotonic() - t0) * 1000)
+                    return _result(True, f"连接成功（业务提示: {msg}）", (time.monotonic() - t0) * 1000)
 
     except aiohttp.ClientError as e:
         return _result(False, f"网络错误: {str(e)}", (time.monotonic() - t0) * 1000)
@@ -221,6 +229,12 @@ async def test_zhipu(api_key: str) -> Dict[str, Any]:
     """
     智谱GLM-OCR - 连通性测试
     调用 layout_parsing 接口（使用最小图片）验证 API Key
+
+    判定策略（连通性测试语义）：
+    - 网络可达 + 认证通过即为「连接成功」
+    - 401/403 → 认证失败（Key 无效）
+    - 其他业务错误（如对测试用的1x1图片报格式/尺寸限制）说明服务已正常
+      受理请求并完成鉴权，属于连通成功，仅在提示中附带业务说明
     """
     t0 = time.monotonic()
     try:
@@ -238,16 +252,31 @@ async def test_zhipu(api_key: str) -> Dict[str, Any]:
             async with session.post(url, headers=headers, json=payload, timeout=aiohttp.ClientTimeout(total=15)) as resp:
                 if resp.status == 200:
                     data = await resp.json()
+                    # HTTP 200 但业务层报错（如模型限流、余额不足）同样需要区分
+                    if isinstance(data, dict) and data.get("error"):
+                        err = data["error"]
+                        msg = err.get("message", str(err)) if isinstance(err, dict) else str(err)
+                        low = msg.lower()
+                        # 认证类错误（个别情况下以200包裹返回）视为失败
+                        if any(k in low for k in ("1002", "invalid", "auth", "token", "api key", "api_key")):
+                            return _result(False, f"认证失败: {msg}", (time.monotonic() - t0) * 1000)
+                        return _result(True, f"连接成功（业务提示: {msg}）", (time.monotonic() - t0) * 1000)
                     if "layout_details" in data or "md_results" in data:
                         return _result(True, "连接成功，API Key 有效", (time.monotonic() - t0) * 1000)
                     return _result(True, "连接成功", (time.monotonic() - t0) * 1000)
                 else:
-                    data = await resp.json()
-                    error = data.get("error", {})
-                    msg = error.get("message", f"HTTP {resp.status}")
+                    try:
+                        data = await resp.json()
+                        error = data.get("error", {})
+                        msg = error.get("message", f"HTTP {resp.status}") if isinstance(error, dict) else str(error)
+                    except Exception:
+                        text = await resp.text()
+                        msg = text[:200] or f"HTTP {resp.status}"
                     if resp.status in (401, 403):
                         return _result(False, f"认证失败: {msg}", (time.monotonic() - t0) * 1000)
-                    return _result(False, f"请求失败: {msg}", (time.monotonic() - t0) * 1000)
+                    # 其他非200（如400格式/尺寸校验、429限流）说明服务可达且鉴权已通过，
+                    # 属于业务层拒绝，连通性测试应视为通过
+                    return _result(True, f"连接成功（业务提示: {msg}）", (time.monotonic() - t0) * 1000)
 
     except aiohttp.ClientError as e:
         return _result(False, f"网络错误: {str(e)}", (time.monotonic() - t0) * 1000)
@@ -283,9 +312,10 @@ async def test_textin(app_id: str, secret_code: str) -> Dict[str, Any]:
                     try:
                         data = await resp.json()
                         msg = data.get("message", data.get("msg", text[:200]))
-                        return _result(False, f"请求失败: {msg}", (time.monotonic() - t0) * 1000)
                     except Exception:
-                        return _result(False, f"HTTP {resp.status}: {text[:200]}", (time.monotonic() - t0) * 1000)
+                        msg = text[:200] or f"HTTP {resp.status}"
+                    # 其他业务错误说明请求已到达服务端并通过认证头校验，连通性视为通过
+                    return _result(True, f"连接成功（业务提示: {msg}）", (time.monotonic() - t0) * 1000)
 
     except aiohttp.ClientError as e:
         return _result(False, f"网络错误: {str(e)}", (time.monotonic() - t0) * 1000)

@@ -1009,7 +1009,7 @@ const loadExistingTranslations = (translatedTasks) => {
 // 连接SSE
 const connectSSE = (tid) => {
   eventSource?.close()
-  eventSource = new EventSource(`http://localhost:8000/api/v1/translation/progress/${tid}`)
+  eventSource = new EventSource(`http://127.0.0.1:8000/api/v1/translation/progress/${tid}`)
 
   eventSource.onmessage = (event) => {
     try {

@@ -86,7 +86,15 @@
               <el-icon><DocumentCopy /></el-icon>
               <span>一键翻译</span>
             </Button1>
-            <Button1 class="help-button" size="small" @click="handleHelp" aria-label="帮助" title="帮助">
+            <!-- 帮助按钮（仅在设置视图显示） -->
+            <Button1
+              v-if="currentView === 'setting'"
+              class="help-button"
+              size="small"
+              @click="handleHelp"
+              aria-label="帮助"
+              title="帮助"
+            >
               <el-icon><QuestionFilled /></el-icon>
               <span>帮助</span>
             </Button1>
@@ -117,6 +125,9 @@
         </div>
       </div>
     </main>
+
+    <!-- API Key 申请帮助弹窗 -->
+    <HelpDialog v-model="helpDialogVisible" />
 
     <!-- 批量翻译配置对话框 -->
     <el-dialog
@@ -218,6 +229,7 @@ import UploadPanel from '../components/UploadPanel.vue'
 import ParsedList from './ParsedList.vue'
 import Settings from './Settings.vue'
 import Button1 from '../elements/button/button1.vue'
+import HelpDialog from '../components/dialogs/HelpDialog.vue'
 import waveIcon from '../elements/icon/海浪.svg'
 import { generatePretranslation, startTranslation, getApiKey, getMaxConcurrent } from '../api/pdf'
 
@@ -288,8 +300,11 @@ const handleRefresh = async () => {
   }
 }
 
+// 帮助弹窗显示状态
+const helpDialogVisible = ref(false)
+
 const handleHelp = () => {
-  window.$toast?.info('帮助文档开发中...')
+  helpDialogVisible.value = true
 }
 
 // 进入批量下载选择模式
@@ -358,7 +373,7 @@ const confirmBatchTranslate = async () => {
     // 保存 API Key
     try {
       await axios.post(
-        'http://localhost:8000/api/v1/translation/config/api-key',
+        'http://127.0.0.1:8000/api/v1/translation/config/api-key',
         null,
         { params: { api_key: batchTranslateConfig.value.apiKey } }
       )

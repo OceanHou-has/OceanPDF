@@ -12,7 +12,7 @@ from collections import deque
 
 from app.services.translation.pretranslation_service import PretranslationService
 from app.services.translation.translation_task_service import TranslationTaskService
-from app.services.translation.llm_service import create_translation_service
+from app.services.translation.llm_service import create_translation_service, test_llm_connection_lightweight
 from app.services.translation.llm_providers import get_providers, get_provider
 
 router = APIRouter()
@@ -185,11 +185,16 @@ async def test_llm_connection(
         测试结果
     """
     try:
-        service = create_translation_service(
+        # 轻量级连通性测试：直接 HTTP 调用 models.list，不构建 SDK 客户端
+        # （SDK 客户端构造约需 1秒/个，之前是总耗时 3-4 秒的主因）
+        _t0 = time.monotonic()
+        result = await test_llm_connection_lightweight(
             api_key=api_key,
-            llm_config={"provider": provider, "base_url": base_url, "model": model}
+            base_url=base_url,
+            model=model,
+            provider=provider
         )
-        result = service.test_connection()
+        logger.info(f"[测试连接耗时] {time.monotonic()-_t0:.2f}s | {result.get('message', '')}")
 
         return {
             "code": 200 if result["success"] else 500,

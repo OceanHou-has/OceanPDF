@@ -381,7 +381,7 @@ export function startTranslation(data) {
  */
 export function getTranslationProgress(taskId) {
   // 返回SSE连接，由调用方自行管理
-  return new EventSource(`http://localhost:8000/api/v1/translation/progress/${taskId}`)
+  return new EventSource(`http://127.0.0.1:8000/api/v1/translation/progress/${taskId}`)
 }
 
 /**
@@ -523,7 +523,7 @@ export function getExportList(pdfName = null) {
  * @returns {string} 下载URL
  */
 export function getExportDownloadUrl(filename) {
-  return `http://localhost:8000/api/v1/export/download/${filename}`
+  return `http://127.0.0.1:8000/api/v1/export/download/${filename}`
 }
 
 /**
@@ -666,5 +666,29 @@ export function deleteDocumentParserConfig(providerId) {
   return request({
     url: `/document-parser/config/${providerId}`,
     method: 'delete'
+  })
+}
+
+/**
+ * 获取默认解析服务ID
+ * @returns {Promise}
+ */
+export function getDefaultParser() {
+  return request({
+    url: '/document-parser/default',
+    method: 'get'
+  })
+}
+
+/**
+ * 设置默认解析服务ID
+ * @param {string} providerId - 服务ID（dps=本地DPS，其余为外部服务）
+ * @returns {Promise}
+ */
+export function saveDefaultParser(providerId) {
+  return request({
+    url: '/document-parser/default',
+    method: 'post',
+    data: { provider_id: providerId }
   })
 }

@@ -193,7 +193,7 @@ const loadList = async () => {
   loading.value = true
   pendingReload.value = false
   try {
-    const response = await axios.get('http://localhost:8000/api/v1/parsed-list')
+    const response = await axios.get('http://127.0.0.1:8000/api/v1/parsed-list')
     
     if (response.data.code === 200) {
       pdfList.value = response.data.data
@@ -341,7 +341,7 @@ const canEnterTranslation = (pdf) => {
 // 删除PDF
 const deletePDF = async (pdfName) => {
   try {
-    const response = await axios.delete(`http://localhost:8000/api/v1/pdf/${pdfName}`)
+    const response = await axios.delete(`http://127.0.0.1:8000/api/v1/pdf/${pdfName}`)
     
     if (response.data.code === 200) {
       window.$toast?.success('删除成功')

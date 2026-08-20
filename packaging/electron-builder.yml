@@ -1,0 +1,47 @@
+# OceanPDF 2.0 electron-builder 打包配置
+# 独立于 frontend/package.json，避免污染原有文件
+# 用法：cd frontend && npx electron-builder --config ../packaging/electron-builder.yml
+
+appId: com.oceanpdf.desktop
+productName: OceanPDF
+copyright: Copyright © 2026 OceanPDF
+
+# 关闭原生模块重编译（项目无原生依赖，避免报错）
+npmRebuild: false
+
+directories:
+  # 安装包输出到 packaging/release，不污染 frontend/
+  output: ../packaging/release
+  buildResources: ../packaging/buildResources
+
+files:
+  # 只打包 Electron 运行所需产物，node_modules 由 electron-builder 自动按需收集
+  - dist-electron/**/*
+  - package.json
+  - "!node_modules/**/*"
+
+extraResources:
+  # 把 PyInstaller 打好的后端整体放入 resources/backend/
+  # 运行时通过 process.resourcesPath/backend/OceanPDFBackend.exe 定位
+  - from: ../packaging/output/backend
+    to: backend
+    filter:
+      - "**/*"
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  # 如需自定义图标，放 packaging/buildResources/icon.ico 后取消注释
+  # icon: ../packaging/buildResources/icon.ico
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: OceanPDF
+  # 卸载时不删除用户数据（数据在 %APPDATA%/OceanPDF，本来也不在安装目录）
+  deleteAppDataOnUninstall: false

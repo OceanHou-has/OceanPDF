@@ -393,7 +393,7 @@ const selectProvider = (provider) => {
 const providersFromBackend = ref(false)
 const loadProviders = async () => {
   try {
-    const response = await axios.get('http://localhost:8000/api/v1/translation/providers')
+    const response = await axios.get('http://127.0.0.1:8000/api/v1/translation/providers')
     if (response.data.code === 200 && Array.isArray(response.data.data) && response.data.data.length) {
       providers.value = response.data.data
       providersFromBackend.value = true
@@ -459,8 +459,8 @@ const validateCurrentModel = () => {
 const loadSavedModelConfig = async () => {
   try {
     const [modelRes, concurrentRes] = await Promise.all([
-      axios.get('http://localhost:8000/api/v1/translation/config/model-config'),
-      axios.get('http://localhost:8000/api/v1/translation/config/max-concurrent').catch(() => null)
+      axios.get('http://127.0.0.1:8000/api/v1/translation/config/model-config'),
+      axios.get('http://127.0.0.1:8000/api/v1/translation/config/max-concurrent').catch(() => null)
     ])
     if (modelRes.data.code === 200 && modelRes.data.data) {
       const saved = modelRes.data.data
@@ -510,7 +510,7 @@ const handleTestApiKey = async () => {
   try {
     // 测试连接（携带厂商/接口地址/模型）
     const response = await axios.post(
-      'http://localhost:8000/api/v1/translation/test',
+      'http://127.0.0.1:8000/api/v1/translation/test',
       null,
       {
         params: {
@@ -546,7 +546,7 @@ const handleTestApiKey = async () => {
 const saveModelConfig = async () => {
   try {
     const response = await axios.post(
-      'http://localhost:8000/api/v1/translation/config/model-config',
+      'http://127.0.0.1:8000/api/v1/translation/config/model-config',
       {
         provider: config.value.provider,
         base_url: config.value.baseUrl.trim(),

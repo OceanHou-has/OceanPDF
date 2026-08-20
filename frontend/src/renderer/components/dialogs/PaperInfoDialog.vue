@@ -186,7 +186,7 @@ const loadMetadata = async () => {
 
   try {
     const response = await axios.get(
-      `http://localhost:8000/api/v1/annotation/${encodeURIComponent(props.pdfName)}/metadata`
+      `http://127.0.0.1:8000/api/v1/annotation/${encodeURIComponent(props.pdfName)}/metadata`
     )
 
     if (response.data.code === 200) {

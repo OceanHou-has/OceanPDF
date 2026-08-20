@@ -12,6 +12,10 @@ from app.services.document_parser.connectivity import test_connectivity
 from app.services.document_parser.config_store import (
     read_config as _read_config,
     write_config as _write_config,
+    get_default_parser as _get_default_parser,
+    set_default_parser as _set_default_parser,
+    DEFAULT_PARSER_KEY,
+    LOCAL_PARSER_ID,
 )
 
 router = APIRouter()
@@ -50,6 +54,11 @@ class TestConnectionRequest(BaseModel):
     config: Dict[str, str] = Field(..., description="配置内容（可选，不传则使用已保存配置）")
 
 
+class SetDefaultParserRequest(BaseModel):
+    """设置默认解析服务请求"""
+    provider_id: str = Field(..., description="服务ID（dps=本地DPS，其余为外部服务）")
+
+
 @router.get("/document-parser/providers")
 async def list_providers():
     """
@@ -76,6 +85,8 @@ async def get_config():
         config = _read_config()
         masked_config = {}
         for provider_id, provider_config in config.items():
+            if provider_id == DEFAULT_PARSER_KEY or not isinstance(provider_config, dict):
+                continue  # 跳过保留字段（默认解析服务等）
             masked_config[provider_id] = _mask_config(provider_id, provider_config)
 
         return {
@@ -133,6 +144,47 @@ async def save_config(request: SaveConfigRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/document-parser/default")
+async def get_default():
+    """
+    获取默认解析服务ID
+    """
+    try:
+        return {
+            "code": 200,
+            "message": "获取成功",
+            "data": {"default_parser": _get_default_parser()}
+        }
+    except Exception as e:
+        logger.error(f"获取默认解析服务失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/document-parser/default")
+async def set_default(request: SetDefaultParserRequest):
+    """
+    设置默认解析服务（上传翻译时自动使用，无需重复选择）
+    """
+    try:
+        provider_id = request.provider_id
+        if provider_id != LOCAL_PARSER_ID and not get_provider(provider_id):
+            raise HTTPException(status_code=400, detail=f"未知的服务ID: {provider_id}")
+
+        _set_default_parser(provider_id)
+        logger.info(f"默认解析服务已设置: {provider_id}")
+
+        return {
+            "code": 200,
+            "message": "默认解析服务设置成功",
+            "data": {"default_parser": provider_id}
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"设置默认解析服务失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/document-parser/test")
 async def test_connection(request: TestConnectionRequest):
     """
@@ -145,11 +197,16 @@ async def test_connection(request: TestConnectionRequest):
 
         # 使用传入的配置，或回退到已保存的配置
         config = request.config
+        saved_config = _read_config().get(request.provider_id, {})
         if not config or all(not v for v in config.values()):
-            saved_config = _read_config()
-            config = saved_config.get(request.provider_id, {})
+            config = saved_config
             if not config:
                 raise HTTPException(status_code=400, detail=f"未配置 {provider['name']}，请先填写配置")
+        else:
+            # 脱敏占位值回退为已保存的真实密钥，避免前端回显的脱敏值导致测试失败
+            for key, value in list(config.items()):
+                if value and "***" in value:
+                    config[key] = saved_config.get(key) or value
 
         # 执行连通性测试
         result = await test_connectivity(request.provider_id, config)
@@ -218,6 +275,9 @@ async def delete_config(provider_id: str):
         config = _read_config()
         if provider_id in config:
             del config[provider_id]
+            # 删除的是当前默认服务时，回退默认到本地DPS
+            if config.get(DEFAULT_PARSER_KEY) == provider_id:
+                config[DEFAULT_PARSER_KEY] = LOCAL_PARSER_ID
             _write_config(config)
             logger.info(f"文档解析配置已删除: {provider_id}")
 

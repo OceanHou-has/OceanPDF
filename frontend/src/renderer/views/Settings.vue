@@ -143,24 +143,56 @@
             <h3>文档解析服务</h3>
             <span class="header-badge">{{ configuredCount }}/{{ totalServices }} 已配置</span>
           </div>
+
+          <!-- 默认解析服务：上传翻译时自动使用，无需重复选择 -->
+          <div class="parser-default-bar">
+            <span class="parser-default-label">默认解析服务</span>
+            <el-select
+              v-model="defaultParser"
+              size="small"
+              class="parser-default-select"
+              :disabled="isSavingDefaultParser"
+              @change="handleDefaultParserChange"
+            >
+              <el-option label="🖥️ 本地DPS（推荐）" value="dps" />
+              <el-option
+                v-for="p in providers.filter(pr => isProviderEnabled(pr.id))"
+                :key="p.id"
+                :label="`${p.emoji} ${p.name}${isProviderConfigured(p.id) ? '' : '（未配置）'}`"
+                :value="p.id"
+                :disabled="!isProviderConfigured(p.id)"
+              />
+            </el-select>
+            <span class="parser-default-tip">上传翻译时将自动使用，无需重复选择</span>
+          </div>
+
           <div class="parser-body">
             <!-- 左侧：服务列表 -->
             <div class="parser-service-list">
-              <div
+              <el-tooltip
                 v-for="provider in providers"
                 :key="provider.id"
-                class="parser-service-item"
-                :class="{ active: selectedProvider?.id === provider.id }"
-                @click="selectProvider(provider)"
+                content="正在引入相关服务，敬请期待..."
+                placement="right"
+                :disabled="isProviderEnabled(provider.id)"
               >
-                <div class="parser-service-info">
-                  <div class="parser-service-name">{{ provider.name }}</div>
-                  <div class="parser-service-status">
-                    <span class="status-dot" :class="{ configured: isProviderConfigured(provider.id) }"></span>
-                    <span class="status-text">{{ isProviderConfigured(provider.id) ? '已配置' : '未配置' }}</span>
+                <div
+                  class="parser-service-item"
+                  :class="{ active: selectedProvider?.id === provider.id, disabled: !isProviderEnabled(provider.id) }"
+                  @click="selectProvider(provider)"
+                >
+                  <div class="parser-service-info">
+                    <div class="parser-service-name">
+                      {{ provider.name }}
+                      <span v-if="defaultParser === provider.id" class="default-badge">默认</span>
+                    </div>
+                    <div class="parser-service-status">
+                      <span class="status-dot" :class="{ configured: isProviderConfigured(provider.id) }"></span>
+                      <span class="status-text">{{ isProviderConfigured(provider.id) ? '已配置' : (isProviderEnabled(provider.id) ? '未配置' : '敬请期待') }}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </el-tooltip>
             </div>
 
             <!-- 右侧：配置表单 -->
@@ -269,6 +301,7 @@ import {
   getApiKey, saveApiKey, getMaxConcurrent, saveMaxConcurrent,
   getDocumentParserProviders, getDocumentParserConfig,
   saveDocumentParserConfig, testDocumentParser, deleteDocumentParserConfig,
+  getDefaultParser, saveDefaultParser,
   getTranslationProviders, getTranslationModelConfig, saveTranslationModelConfig,
   testTranslationAPI
 } from '../api/pdf'
@@ -344,7 +377,7 @@ async function handleTestConn() {
     // 使用原生 axios 绕过 request 拦截器（拦截器会在 code!==200 时 reject，丢失错误详情）
     const rawAxios = (await import('axios')).default
     const res = await rawAxios.post(
-      'http://localhost:8000/api/v1/translation/test',
+      'http://127.0.0.1:8000/api/v1/translation/test',
       null,
       {
         params: {
@@ -401,9 +434,17 @@ const parserFormConfig = reactive({})
 const isTestingParser = ref(false)
 const isSavingParser = ref(false)
 const parserTestResult = ref(null)
+const defaultParser = ref('dps')
+const isSavingDefaultParser = ref(false)
 
 const configuredCount = computed(() => providers.value.filter(p => isProviderConfigured(p.id)).length)
 const totalServices = computed(() => providers.value.length)
+
+// 当前仅智谱GLM-OCR已接入，其余服务暂未开放（置灰不可点击）
+const ENABLED_PARSER_IDS = ['zhipu']
+function isProviderEnabled(providerId) {
+  return ENABLED_PARSER_IDS.includes(providerId)
+}
 
 function isProviderConfigured(providerId) {
   const config = savedParserConfig.value[providerId]
@@ -415,25 +456,23 @@ function isProviderConfigured(providerId) {
 }
 
 function selectProvider(provider) {
+  if (!isProviderEnabled(provider.id)) return
   selectedProvider.value = provider
   parserTestResult.value = null
   Object.keys(parserFormConfig).forEach(key => delete parserFormConfig[key])
   const saved = savedParserConfig.value[provider.id] || {}
   provider.config_fields.forEach(field => {
-    const val = saved[field.key] || ''
-    if (val && !val.includes('***')) {
-      parserFormConfig[field.key] = val
-    } else {
-      parserFormConfig[field.key] = ''
-    }
+    // 回填已保存的值（脱敏值也显示，保存时后端会忽略脱敏占位值，不会覆盖真实密钥）
+    parserFormConfig[field.key] = saved[field.key] || ''
   })
 }
 
 async function loadParserData() {
   try {
-    const [providersRes, configRes] = await Promise.all([
+    const [providersRes, configRes, defaultRes] = await Promise.all([
       getDocumentParserProviders(),
-      getDocumentParserConfig()
+      getDocumentParserConfig(),
+      getDefaultParser().catch(() => null)
     ])
     if (providersRes?.code === 200 && providersRes.data) {
       providers.value = providersRes.data
@@ -441,8 +480,29 @@ async function loadParserData() {
     if (configRes?.code === 200 && configRes.data) {
       savedParserConfig.value = configRes.data
     }
+    if (defaultRes?.code === 200 && defaultRes.data?.default_parser) {
+      defaultParser.value = defaultRes.data.default_parser
+    }
   } catch (error) {
     console.error('加载文档解析配置失败:', error)
+  }
+}
+
+// 切换默认解析服务（立即保存到后端）
+async function handleDefaultParserChange(value) {
+  if (isSavingDefaultParser.value) return
+  isSavingDefaultParser.value = true
+  try {
+    const res = await saveDefaultParser(value)
+    if (res?.code === 200) {
+      window.$toast?.success('默认解析服务已保存，上传翻译时将自动使用')
+    } else {
+      window.$toast?.error(res?.message || '默认解析服务设置失败')
+    }
+  } catch (error) {
+    window.$toast?.error('设置失败：' + (error.message || '未知错误'))
+  } finally {
+    isSavingDefaultParser.value = false
   }
 }
 
@@ -502,6 +562,10 @@ async function handleDeleteParser() {
     if (res?.code === 200) {
       window.$toast?.success('配置已删除')
       delete savedParserConfig.value[selectedProvider.value.id]
+      // 删除的是当前默认服务时，后端已回退默认到本地DPS，前端同步
+      if (defaultParser.value === selectedProvider.value.id) {
+        defaultParser.value = 'dps'
+      }
       Object.keys(parserFormConfig).forEach(key => delete parserFormConfig[key])
       parserTestResult.value = null
     }
@@ -899,6 +963,33 @@ onMounted(() => {
   border-radius: 12px;
 }
 
+// 默认解析服务选择栏
+.parser-default-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border-bottom: 1px solid #f0f0f0;
+
+  .parser-default-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #475569;
+    white-space: nowrap;
+  }
+
+  .parser-default-select {
+    width: 240px;
+  }
+
+  .parser-default-tip {
+    font-size: 12px;
+    color: #94a3b8;
+    white-space: nowrap;
+  }
+}
+
 .parser-body {
   display: flex;
   min-height: 360px;
@@ -934,6 +1025,20 @@ onMounted(() => {
       background: #f0f4ff;
     }
 
+    &.disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      filter: grayscale(0.6);
+
+      &:hover {
+        background: transparent;
+      }
+
+      .parser-service-name {
+        color: #94a3b8;
+      }
+    }
+
     .parser-service-info {
       flex: 1;
       min-width: 0;
@@ -946,6 +1051,19 @@ onMounted(() => {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+
+      .default-badge {
+        display: inline-block;
+        margin-left: 4px;
+        padding: 0 5px;
+        font-size: 10px;
+        font-weight: 600;
+        color: #4f6bff;
+        background: #f0f4ff;
+        border: 1px solid #dbe4ff;
+        border-radius: 6px;
+        vertical-align: 1px;
+      }
     }
 
     .parser-service-status {

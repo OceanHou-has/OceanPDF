@@ -3,8 +3,11 @@
 通过 OpenAI 兼容协议统一接入各大模型厂商（DeepSeek / 千问 / 豆包 / Google / GPT 等）
 """
 import asyncio
+import time
 from typing import Dict, List, Optional, Any
 from openai import OpenAI, AsyncOpenAI
+import openai
+import aiohttp
 from loguru import logger
 
 from app.core.config import settings
@@ -262,12 +265,33 @@ class LLMTranslationService:
 
     def test_connection(self) -> Dict[str, Any]:
         """
-        测试 API 连接
-        优先使用轻量级 models.list 接口（0.3-1秒），失败时回退到一次最小对话请求
+        测试 API 连接（同步包装，兼容旧调用方）
         """
+        try:
+            return asyncio.run(self.test_connection_async())
+        except RuntimeError:
+            # 已处于事件循环内（如 FastAPI 异步上下文直接调用）时用独立线程执行
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                return pool.submit(asyncio.run, self.test_connection_async()).result()
+
+    async def test_connection_async(self) -> Dict[str, Any]:
+        """
+        测试 API 连接（异步、快速失败版）
+
+        优化策略：
+        - 使用轻量级 models.list 接口（通常 0.3-1秒）
+        - 测试专用短超时（8秒），避免网络异常时长时间等待
+        - 认证类错误（401/403）立即返回失败，不再回退发对话请求
+        - 仅当接口不支持 models.list（404/405）时才回退到最小对话请求
+        """
+        t0 = time.monotonic()
+        # 测试专用短超时，避免复用翻译任务的长超时（180s）
+        test_timeout = 8.0
+
         # 1. 优先尝试 models.list
         try:
-            models = self.client.models.list()
+            models = await self.async_client.models.list(timeout=test_timeout)
             model_ids = []
             try:
                 model_ids = [m.id for m in getattr(models, "data", [])][:5]
@@ -280,16 +304,46 @@ class LLMTranslationService:
                 "model": self.model,
                 "available_models": model_ids
             }
+        except openai.AuthenticationError as e:
+            # Key 无效，无需再试
+            logger.warning(f"API 认证失败: {str(e)}")
+            return self._fail_result(f"认证失败: API Key 无效或已过期")
+        except openai.PermissionDeniedError as e:
+            logger.warning(f"API 无权限访问: {str(e)}")
+            return self._fail_result(f"认证失败: API Key 没有权限访问该服务")
+        except openai.APITimeoutError:
+            logger.warning("models.list 超时")
+            return self._fail_result(f"连接超时（>{int(test_timeout)}秒），请检查网络连接或接口地址")
+        except openai.NotFoundError as e:
+            # 部分厂商不支持 models.list，回退到最小对话请求
+            logger.info(f"models.list 不支持，回退对话测试: {str(e)}")
+        except openai.APIStatusError as e:
+            if e.status_code == 405:
+                logger.info("models.list 不支持(405)，回退对话测试")
+            else:
+                # 其他 HTTP 错误（如 429 限流）：服务可达，按连通成功提示
+                logger.warning(f"models.list 返回 HTTP {e.status_code}")
+                if e.status_code == 429:
+                    return {
+                        "success": True,
+                        "message": f"连接正常，但请求频率过高（{self.provider}）",
+                        "provider": self.provider,
+                        "model": self.model
+                    }
+                return self._fail_result(f"请求失败 (HTTP {e.status_code}): {str(e)[:200]}")
+        except openai.APIConnectionError as e:
+            logger.warning(f"无法连接到 API 服务: {str(e)}")
+            return self._fail_result(f"无法连接到服务，请检查接口地址和网络: {str(e)[:200]}")
         except Exception as e:
-            list_err = str(e)
-            logger.warning(f"models.list 测试失败，回退到对话测试: {list_err}")
+            logger.warning(f"models.list 测试失败，回退到对话测试: {str(e)}")
 
-        # 2. 回退：最小对话请求
+        # 2. 回退：最小对话请求（仅用于不支持 models.list 的厂商）
         try:
-            response = self.client.chat.completions.create(
+            response = await self.async_client.chat.completions.create(
                 model=self.model,
-                messages=[{"role": "user", "content": "Hello"}],
-                max_tokens=10
+                messages=[{"role": "user", "content": "hi"}],
+                max_tokens=1,
+                timeout=test_timeout * 2
             )
             return {
                 "success": True,
@@ -298,14 +352,86 @@ class LLMTranslationService:
                 "model": self.model,
                 "response": response.choices[0].message.content
             }
+        except openai.AuthenticationError:
+            return self._fail_result("认证失败: API Key 无效或已过期")
+        except openai.PermissionDeniedError:
+            return self._fail_result("认证失败: API Key 没有权限访问该服务")
+        except openai.APITimeoutError:
+            return self._fail_result(f"连接超时，请检查网络连接或接口地址")
         except Exception as e:
             logger.error(f"API 连接测试失败: {str(e)}")
-            return {
-                "success": False,
-                "message": f"连接失败: {str(e)}",
-                "provider": self.provider,
-                "model": self.model
-            }
+            return self._fail_result(f"连接失败: {str(e)[:300]}")
+
+    def _fail_result(self, message: str) -> Dict[str, Any]:
+        return {
+            "success": False,
+            "message": message,
+            "provider": self.provider,
+            "model": self.model
+        }
+
+
+async def test_llm_connection_lightweight(
+    api_key: str,
+    base_url: Optional[str] = None,
+    model: Optional[str] = None,
+    provider: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    轻量级连通性测试（直接 HTTP 调用，不构建 SDK 客户端）
+
+    背景：OpenAI SDK 客户端构造本身约需 1秒/个，而测试接口只需一次
+    models.list 请求（~0.2s），故改用 aiohttp 直接请求，总耗时可降至 0.5s 以内。
+    判定策略与 test_connection_async 一致：认证错误立即失败，429 视为连通。
+    """
+    url = (base_url or settings.DEEPSEEK_API_BASE).strip().rstrip("/") + "/models"
+    model_name = (model or settings.DEEPSEEK_MODEL).strip()
+    provider_name = (provider or "").strip() or "deepseek"
+    headers = {"Authorization": f"Bearer {api_key}"}
+
+    def _ok(message: str, extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        result = {"success": True, "message": message, "provider": provider_name, "model": model_name}
+        if extra:
+            result.update(extra)
+        return result
+
+    def _fail(message: str) -> Dict[str, Any]:
+        return {"success": False, "message": message, "provider": provider_name, "model": model_name}
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=8)) as resp:
+                try:
+                    data = await resp.json(content_type=None)
+                except Exception:
+                    data = {}
+
+                if resp.status == 200:
+                    model_ids = []
+                    try:
+                        model_ids = [m.get("id", "") for m in (data.get("data") or [])][:5]
+                    except Exception:
+                        pass
+                    return _ok(f"连接正常（{provider_name} / {model_name}）", {"available_models": model_ids})
+                if resp.status in (401, 403):
+                    return _fail("认证失败: API Key 无效或已过期")
+                if resp.status == 429:
+                    return _ok(f"连接正常，但请求频率过高（{provider_name}）")
+                if resp.status in (404, 405):
+                    # 厂商不支持 models.list：能收到响应说明服务可达，视为连通
+                    return _ok(f"连接成功（{provider_name} 不支持模型列表查询，已验证服务可达）")
+                msg = ""
+                if isinstance(data, dict):
+                    err = data.get("error") or {}
+                    msg = err.get("message", "") if isinstance(err, dict) else str(err)
+                return _fail(f"请求失败 (HTTP {resp.status}): {msg or '未知错误'}")
+    except asyncio.TimeoutError:
+        return _fail("连接超时（>8秒），请检查网络连接或接口地址")
+    except aiohttp.ClientError as e:
+        return _fail(f"无法连接到服务，请检查接口地址和网络: {str(e)[:200]}")
+    except Exception as e:
+        logger.error(f"轻量级连接测试异常: {str(e)}")
+        return _fail(f"测试异常: {str(e)[:200]}")
 
 
 def create_translation_service(

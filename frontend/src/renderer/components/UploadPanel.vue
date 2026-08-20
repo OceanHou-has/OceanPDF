@@ -49,9 +49,9 @@
         <el-option
           v-for="p in externalParsers"
           :key="p.id"
-          :label="`${p.emoji} ${p.name}${p.configured ? '' : '（未配置，请先去设置页配置）'}`"
+          :label="`${p.emoji} ${p.name}${isParserEnabled(p.id) ? (p.configured ? '' : '（未配置，请先去设置页配置）') : '（正在引入，敬请期待）'}`"
           :value="p.id"
-          :disabled="!p.configured"
+          :disabled="!isParserEnabled(p.id) || !p.configured"
         />
       </el-select>
       <span v-if="selectedParser !== 'dps'" class="parser-tip">外部服务按页计费，请留意用量</span>
@@ -119,7 +119,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { UploadFilled, Document, Delete, Plus } from '@element-plus/icons-vue'
-import { uploadPDF, getDocumentParserStatus } from '../api/pdf'
+import { uploadPDF, getDocumentParserStatus, getDefaultParser } from '../api/pdf'
 
 const router = useRouter()
 const uploadRef = ref(null)
@@ -129,11 +129,25 @@ const uploading = ref(false)
 const selectedParser = ref('dps')
 const externalParsers = ref([])
 
+// 当前仅智谱GLM-OCR已接入，其余外部服务暂未开放选择
+const ENABLED_PARSER_IDS = ['zhipu']
+const isParserEnabled = (id) => ENABLED_PARSER_IDS.includes(id)
+
 const loadParserStatus = async () => {
   try {
-    const res = await getDocumentParserStatus()
+    const [res, defaultRes] = await Promise.all([
+      getDocumentParserStatus(),
+      getDefaultParser().catch(() => null)
+    ])
     const list = res?.data ?? []
     externalParsers.value = Array.isArray(list) ? list : []
+
+    // 应用设置页保存的默认解析服务（非法或未配置时回退本地DPS）
+    const def = defaultRes?.data?.default_parser || 'dps'
+    const isValid = def === 'dps' || externalParsers.value.some(
+      (p) => p.id === def && isParserEnabled(def) && p.configured
+    )
+    selectedParser.value = isValid ? def : 'dps'
   } catch (e) {
     console.warn('[UploadPanel] 获取解析服务状态失败:', e)
   }
@@ -283,7 +297,7 @@ const uploadOne = async (item) => {
 
   try {
     // 启动SSE进度推送
-    const baseURL = 'http://localhost:8000'
+    const baseURL = 'http://127.0.0.1:8000'
     eventSource = new EventSource(`${baseURL}/api/v1/upload/progress/${taskId}`)
     
     eventSource.onmessage = (event) => {
