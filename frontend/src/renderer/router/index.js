@@ -2,6 +2,7 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 import Home from '../views/Home.vue'
 import PDFAnnotation from '../views/PDFAnnotation.vue'
 import TranslationExecution from '../views/TranslationExecution.vue'
+import AiChat from '../views/AiChat.vue'
 
 const routes = [
   {
@@ -26,6 +27,14 @@ const routes = [
     component: TranslationExecution,
     meta: {
       title: 'OceanPDF - 翻译执行'
+    }
+  },
+  {
+    path: '/ai-chat',
+    name: 'AiChat',
+    component: AiChat,
+    meta: {
+      title: 'OceanPDF - AI问答'
     }
   }
 ]

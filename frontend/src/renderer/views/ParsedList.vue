@@ -75,13 +75,21 @@
               <span>查看标注</span>
             </Button2>
             <Button2
-              v-if="canEnterTranslation(pdf)" 
+              v-if="canEnterTranslation(pdf)"
               title="查看翻译"
               aria-label="查看翻译"
               @click.stop="openTranslation(pdf.pdf_name)"
             >
               <el-icon><View /></el-icon>
               <span>查看翻译</span>
+            </Button2>
+            <Button2
+              title="AI问答"
+              aria-label="AI问答"
+              @click.stop="openAiChat(pdf.pdf_name)"
+            >
+              <el-icon><ChatDotRound /></el-icon>
+              <span>AI问答</span>
             </Button2>
             <div class="delete-action" @click.stop>
               <DeleteButton
@@ -106,7 +114,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { DocumentChecked, Files, Clock, View } from '@element-plus/icons-vue'
+import { DocumentChecked, Files, Clock, View, ChatDotRound } from '@element-plus/icons-vue'
 import axios from 'axios'
 import { getActiveTranslationTasks } from '../api/pdf'
 import PdfExportDialog from '../components/PdfExportDialog.vue'
@@ -283,6 +291,16 @@ const openPDF = (pdfName) => {
 const openTranslation = (pdfName) => {
   router.push({
     path: '/translation',  // 修正路径
+    query: {
+      pdfName: pdfName
+    }
+  })
+}
+
+// 打开AI问答页面
+const openAiChat = (pdfName) => {
+  router.push({
+    path: '/ai-chat',
     query: {
       pdfName: pdfName
     }

@@ -263,6 +263,35 @@ class LLMTranslationService:
 
         return results
 
+    async def chat_stream_async(
+        self,
+        messages: List[Dict[str, str]],
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+    ):
+        """
+        通用 OpenAI 兼容对话流式接口（用于论文 AI 问答等场景）
+
+        Args:
+            messages: 完整消息列表 [{"role": "system"/"user"/"assistant", "content": "..."}]
+            temperature: 采样温度（None 时用实例默认值）
+            max_tokens: 单次请求最大 token 数（None 时用实例默认值）
+
+        Yields:
+            逐块返回文本片段（str）
+        """
+        response = await self.async_client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            temperature=self.temperature if temperature is None else temperature,
+            max_tokens=max_tokens or self.max_tokens,
+            stream=True,
+        )
+
+        async for chunk in response:
+            if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+
     def test_connection(self) -> Dict[str, Any]:
         """
         测试 API 连接（同步包装，兼容旧调用方）

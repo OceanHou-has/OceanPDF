@@ -4,7 +4,7 @@ from loguru import logger
 import sys
 
 from app.core.config import settings
-from app.api import upload, translate, task, pdf, annotation, export, document_parser
+from app.api import upload, translate, task, pdf, annotation, export, document_parser, qa, tools
 
 # 配置日志
 logger.remove()
@@ -44,6 +44,8 @@ app.include_router(pdf.router, prefix="/api/v1", tags=["pdf"])
 app.include_router(annotation.router, prefix="/api/v1", tags=["annotation"])
 app.include_router(export.router, prefix="/api/v1", tags=["export"])
 app.include_router(document_parser.router, prefix="/api/v1", tags=["document_parser"])
+app.include_router(qa.router, prefix="/api/v1", tags=["qa"])
+app.include_router(tools.router, prefix="/api/v1", tags=["tools"])
 
 @app.get("/")
 async def root():

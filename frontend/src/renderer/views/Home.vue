@@ -24,7 +24,15 @@
           <el-icon><FolderOpened /></el-icon>
           <span>已解析PDF</span>
         </div>
-        <div 
+        <div
+          class="nav-item"
+          :class="{ active: currentView === 'tools' }"
+          @click="switchView('tools')"
+        >
+          <el-icon><Tools /></el-icon>
+          <span>实用工具</span>
+        </div>
+        <div
           class="nav-item"
           :class="{ active: currentView === 'setting' }"
           @click="switchView('setting')"
@@ -122,6 +130,11 @@
           <div v-show="currentView === 'setting'" class="view-container setting-view">
             <Settings />
           </div>
+
+          <!-- 使用工具页面 -->
+          <div v-show="currentView === 'tools'" class="view-container tools-view">
+            <ToolsView />
+          </div>
         </div>
       </div>
     </main>
@@ -214,20 +227,22 @@
 
 <script setup>
 import { ref, computed, nextTick } from 'vue'
-import { 
-  Upload, 
-  Setting, 
+import {
+  Upload,
+  Setting,
   QuestionFilled,
   FolderOpened,
   Refresh,
   DocumentCopy,
   ArrowRight,
-  Download
+  Download,
+  Tools
 } from '@element-plus/icons-vue'
 import axios from 'axios'
 import UploadPanel from '../components/UploadPanel.vue'
 import ParsedList from './ParsedList.vue'
 import Settings from './Settings.vue'
+import ToolsView from './Tools.vue'
 import Button1 from '../elements/button/button1.vue'
 import HelpDialog from '../components/dialogs/HelpDialog.vue'
 import waveIcon from '../elements/icon/海浪.svg'
@@ -264,7 +279,8 @@ const pageTitle = computed(() => {
   const titles = {
     upload: 'PDF文档翻译',
     parsed: '已解析PDF',
-    setting: '系统设置'
+    setting: '系统设置',
+    tools: '实用工具'
   }
   return titles[currentView.value] || ''
 })
@@ -273,7 +289,8 @@ const pageDesc = computed(() => {
   const descs = {
     upload: '上传PDF文档，智能解析并翻译为双语对照版本',
     parsed: '查看已经解析完成的PDF文档列表',
-    setting: '配置翻译参数和API密钥'
+    setting: '配置翻译参数和API密钥',
+    tools: 'PDF合并、拆分、压缩等常用文档处理工具'
   }
   return descs[currentView.value] || ''
 })
@@ -883,6 +900,10 @@ const confirmBatchTranslate = async () => {
     }
     
     &.setting-view {
+      padding: 0;
+    }
+
+    &.tools-view {
       padding: 0;
     }
   }
