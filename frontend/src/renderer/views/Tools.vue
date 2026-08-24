@@ -45,165 +45,68 @@
       <p class="tools-footer">更多工具板块（图片处理、格式转换等）即将上线</p>
     </div>
 
-    <!-- 隐藏文件选择框 -->
-    <input
-      ref="singleInputRef"
-      type="file"
-      accept=".pdf,application/pdf"
-      class="hidden-input"
-      @change="onSingleFileChange"
-    />
-    <input
-      ref="mergeInputRef"
-      type="file"
-      accept=".pdf,application/pdf"
-      multiple
-      class="hidden-input"
-      @change="onMergeFilesChange"
-    />
-
-    <!-- 工具对话框 -->
+    <!-- 工具对话框：每个工具使用独立的工作台组件 -->
     <el-dialog
       v-model="dialogVisible"
       :title="activeTool?.name || ''"
-      width="560px"
+      :width="dialogWidth"
       :close-on-click-modal="false"
+      :show-close="false"
+      destroy-on-close
       class="tool-dialog"
     >
-      <div class="tool-form">
-        <!-- 合并 PDF -->
-        <template v-if="activeTool?.id === 'merge'">
-          <div class="form-field">
-            <label class="form-label">选择文件（可多选，按顺序合并）</label>
-            <div class="file-picker">
-              <el-button type="primary" plain @click="triggerMerge">
-                <el-icon style="margin-right: 6px"><FolderOpened /></el-icon>选择 PDF 文件
-              </el-button>
-              <span class="hint">可多选，选后可用右侧按钮调整顺序</span>
-            </div>
+      <template #header="{ close }">
+        <div class="tool-dialog-header">
+          <div class="header-left">
+            <span
+              class="header-icon"
+              :style="{ backgroundColor: activeTool?.color + '1A', color: activeTool?.color }"
+            >
+              <el-icon><component :is="activeTool?.icon" /></el-icon>
+            </span>
+            <span class="header-title">{{ activeTool?.name }}</span>
           </div>
-          <div v-if="mergeFiles.length" class="merge-list">
-            <div v-for="(f, i) in mergeFiles" :key="f.name + f.size" class="merge-item">
-              <span class="merge-idx">{{ i + 1 }}</span>
-              <span class="merge-name" :title="f.name">{{ f.name }}</span>
-              <div class="merge-actions">
-                <el-button size="small" text :disabled="i === 0" @click="moveMerge(i, -1)">
-                  <el-icon><ArrowUp /></el-icon>
-                </el-button>
-                <el-button size="small" text :disabled="i === mergeFiles.length - 1" @click="moveMerge(i, 1)">
-                  <el-icon><ArrowDown /></el-icon>
-                </el-button>
-                <el-button size="small" text type="danger" @click="removeMerge(i)">
-                  <el-icon><Close /></el-icon>
-                </el-button>
-              </div>
-            </div>
-          </div>
-        </template>
-
-        <!-- 单文件工具 -->
-        <template v-else-if="singleFileToolIds.includes(activeTool?.id)">
-          <div class="form-field">
-            <label class="form-label">选择文件</label>
-            <div class="file-picker">
-              <el-button type="primary" plain @click="triggerSingle">
-                <el-icon style="margin-right: 6px"><FolderOpened /></el-icon>选择 PDF 文件
-              </el-button>
-              <span v-if="singleFile" class="selected-name" :title="singleFile.name">
-                <el-icon style="margin-right: 4px"><DocumentChecked /></el-icon>{{ singleFile.name }}
-              </span>
-            </div>
-          </div>
-
-          <!-- 拆分 -->
-          <template v-if="activeTool?.id === 'split'">
-            <div class="form-field">
-              <label class="form-label">拆分方式</label>
-              <el-radio-group v-model="form.splitMode">
-                <el-radio value="ranges">按页码范围</el-radio>
-                <el-radio value="every">每 N 页拆分</el-radio>
-              </el-radio-group>
-            </div>
-            <div class="form-field">
-              <label class="form-label">{{ form.splitMode === 'ranges' ? '拆分范围' : '每几页一份' }}</label>
-              <el-input
-                v-if="form.splitMode === 'ranges'"
-                v-model="form.spec"
-                placeholder="如：1-3,4,5-8，每个范围生成一个文件"
-              />
-              <el-input-number v-else v-model="form.every" :min="1" :max="999" />
-            </div>
-          </template>
-
-          <!-- 提取 / 删除 -->
-          <template v-else-if="activeTool?.id === 'extract' || activeTool?.id === 'delete'">
-            <div class="form-field">
-              <label class="form-label">
-                {{ activeTool.id === 'extract' ? '要提取的页码' : '要删除的页码' }}
-              </label>
-              <el-input
-                v-model="form.spec"
-                :placeholder="activeTool.id === 'extract' ? '如：1-3,5,7' : '如：2,4-6'"
-              />
-              <span class="hint">页码从 1 开始，用逗号分隔，支持连续范围</span>
-            </div>
-          </template>
-
-          <!-- 旋转 -->
-          <template v-else-if="activeTool?.id === 'rotate'">
-            <div class="form-field">
-              <label class="form-label">旋转角度</label>
-              <el-radio-group v-model="form.angle">
-                <el-radio-button :value="90">顺时针 90°</el-radio-button>
-                <el-radio-button :value="180">180°</el-radio-button>
-                <el-radio-button :value="270">顺时针 270°</el-radio-button>
-              </el-radio-group>
-            </div>
-            <div class="form-field">
-              <el-checkbox v-model="form.rotateAll">全部页面</el-checkbox>
-            </div>
-            <div v-if="!form.rotateAll" class="form-field">
-              <label class="form-label">要旋转的页码</label>
-              <el-input v-model="form.rotatePages" placeholder="如：1-3,5" />
-            </div>
-          </template>
-
-          <!-- 重排 -->
-          <template v-else-if="activeTool?.id === 'reorder'">
-            <div class="form-field">
-              <label class="form-label">新的页面顺序</label>
-              <el-input v-model="form.spec" placeholder="如：3,1,2 或 2-4,1（按此顺序重新排列）" />
-              <span class="hint">页码从 1 开始，用逗号分隔，支持连续范围</span>
-            </div>
-          </template>
-        </template>
-      </div>
-
-      <!-- 处理结果 -->
-      <div v-if="results.length" class="tool-results">
-        <div class="results-title">处理完成，点击下载：</div>
-        <div v-for="r in results" :key="r.filename" class="result-item">
-          <el-icon class="result-icon"><Document /></el-icon>
-          <span class="result-name" :title="r.filename">{{ r.filename }}</span>
-          <el-button type="primary" size="small" @click="downloadOutput(r)">下载</el-button>
-        </div>
-      </div>
-
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="dialogVisible = false">关闭</el-button>
-          <el-button type="primary" :loading="submitting" @click="submit">{{ submitLabel }}</el-button>
+          <button
+            class="header-close"
+            type="button"
+            aria-label="关闭弹窗"
+            title="关闭"
+            @click="close"
+          >
+            <el-icon><Close /></el-icon>
+          </button>
         </div>
       </template>
+
+      <div class="tool-form">
+        <template v-if="activeTool?.id === 'merge'">
+          <MergeWorkbench />
+        </template>
+        <template v-else-if="activeTool?.id === 'split'">
+          <SplitWorkbench />
+        </template>
+        <template v-else-if="activeTool?.id === 'delete'">
+          <DeleteWorkbench />
+        </template>
+        <template v-else-if="activeTool?.id === 'reorder'">
+          <ReorderWorkbench />
+        </template>
+        <template v-else-if="activeTool?.id === 'extract'">
+          <ExtractWorkbench />
+        </template>
+        <template v-else-if="activeTool?.id === 'rotate'">
+          <RotateWorkbench />
+        </template>
+      </div>
+
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, computed } from 'vue'
 import {
   Document,
-  DocumentChecked,
   CopyDocument,
   Tickets,
   Postcard,
@@ -218,20 +121,14 @@ import {
   Unlock,
   Brush,
   InfoFilled,
-  FolderOpened,
-  ArrowUp,
-  ArrowDown,
   Close
 } from '@element-plus/icons-vue'
-import {
-  mergePDFs,
-  splitPDF,
-  extractPages,
-  deletePages,
-  rotatePages,
-  reorderPages,
-  getToolDownloadUrl
-} from '../api/tools'
+import MergeWorkbench from '../components/MergeWorkbench.vue'
+import SplitWorkbench from '../components/SplitWorkbench.vue'
+import DeleteWorkbench from '../components/DeleteWorkbench.vue'
+import ReorderWorkbench from '../components/ReorderWorkbench.vue'
+import ExtractWorkbench from '../components/ExtractWorkbench.vue'
+import RotateWorkbench from '../components/RotateWorkbench.vue'
 
 // 每个板块下按用途分组，方便后续扩展新的板块（图片处理、格式转换等）
 const toolGroups = [
@@ -266,39 +163,20 @@ const toolGroups = [
   }
 ]
 
-const singleFileToolIds = ['split', 'extract', 'delete', 'rotate', 'reorder']
-
 // 对话框状态
 const dialogVisible = ref(false)
 const activeTool = ref(null)
-const submitting = ref(false)
-const results = ref([])
 
-// 文件状态
-const singleFile = ref(null)
-const mergeFiles = ref([])
-const singleInputRef = ref(null)
-const mergeInputRef = ref(null)
-
-const form = reactive({
-  spec: '',
-  splitMode: 'ranges',
-  every: 1,
-  angle: 90,
-  rotateAll: true,
-  rotatePages: ''
-})
-
-const submitLabel = computed(() => {
-  const labels = {
-    merge: '开始合并',
-    split: '开始拆分',
-    extract: '开始提取',
-    delete: '开始删除',
-    rotate: '开始旋转',
-    reorder: '开始重排'
+const dialogWidth = computed(() => {
+  const widths = {
+    merge: '880px',
+    split: '860px',
+    delete: '860px',
+    reorder: '860px',
+    extract: '860px',
+    rotate: '860px'
   }
-  return labels[activeTool.value?.id] || '开始处理'
+  return widths[activeTool.value?.id] || '560px'
 })
 
 const handleToolClick = (tool) => {
@@ -312,126 +190,6 @@ const handleToolClick = (tool) => {
 const openTool = (tool) => {
   activeTool.value = tool
   dialogVisible.value = true
-  results.value = []
-  singleFile.value = null
-  mergeFiles.value = []
-  Object.assign(form, {
-    spec: '',
-    splitMode: 'ranges',
-    every: 1,
-    angle: 90,
-    rotateAll: true,
-    rotatePages: ''
-  })
-}
-
-const triggerSingle = () => singleInputRef.value?.click()
-const triggerMerge = () => mergeInputRef.value?.click()
-
-const onSingleFileChange = (e) => {
-  const f = e.target.files?.[0]
-  if (f) singleFile.value = f
-  e.target.value = ''
-}
-
-const onMergeFilesChange = (e) => {
-  const files = Array.from(e.target.files || [])
-  for (const f of files) {
-    if (!mergeFiles.value.some((x) => x.name === f.name && x.size === f.size)) {
-      mergeFiles.value.push(f)
-    }
-  }
-  e.target.value = ''
-}
-
-const removeMerge = (i) => mergeFiles.value.splice(i, 1)
-const moveMerge = (i, dir) => {
-  const j = i + dir
-  if (j < 0 || j >= mergeFiles.value.length) return
-  const arr = mergeFiles.value
-  const tmp = arr[i]
-  arr[i] = arr[j]
-  arr[j] = tmp
-}
-
-const submit = async () => {
-  const tool = activeTool.value
-  if (!tool) return
-
-  if (tool.id === 'merge') {
-    if (mergeFiles.value.length < 2) {
-      window.$toast?.warning('请至少选择 2 个 PDF 文件')
-      return
-    }
-  } else {
-    if (!singleFile.value) {
-      window.$toast?.warning('请先选择 PDF 文件')
-      return
-    }
-    if (['extract', 'delete', 'reorder'].includes(tool.id) && !form.spec.trim()) {
-      window.$toast?.warning('请输入页码')
-      return
-    }
-    if (tool.id === 'split' && form.splitMode === 'ranges' && !form.spec.trim()) {
-      window.$toast?.warning('请输入拆分范围')
-      return
-    }
-    if (tool.id === 'rotate' && !form.rotateAll && !form.rotatePages.trim()) {
-      window.$toast?.warning('请输入要旋转的页码')
-      return
-    }
-  }
-
-  submitting.value = true
-  results.value = []
-  try {
-    let res
-    switch (tool.id) {
-      case 'merge':
-        res = await mergePDFs(mergeFiles.value)
-        break
-      case 'split':
-        res = await splitPDF(singleFile.value, {
-          mode: form.splitMode,
-          spec: form.splitMode === 'ranges' ? form.spec : undefined,
-          every: form.splitMode === 'every' ? form.every : undefined
-        })
-        break
-      case 'extract':
-        res = await extractPages(singleFile.value, form.spec)
-        break
-      case 'delete':
-        res = await deletePages(singleFile.value, form.spec)
-        break
-      case 'rotate':
-        res = await rotatePages(singleFile.value, {
-          angle: form.angle,
-          pages: form.rotateAll ? undefined : form.rotatePages
-        })
-        break
-      case 'reorder':
-        res = await reorderPages(singleFile.value, form.spec)
-        break
-    }
-    if (res && res.code === 200) {
-      results.value = res.data.outputs || []
-      window.$toast?.success(`处理完成，共 ${results.value.length} 个文件`)
-    }
-  } catch (e) {
-    const msg = e?.response?.data?.detail || e?.message || '未知错误'
-    window.$toast?.error('处理失败：' + msg)
-  } finally {
-    submitting.value = false
-  }
-}
-
-const downloadOutput = (out) => {
-  const link = document.createElement('a')
-  link.href = getToolDownloadUrl(out.filename)
-  link.download = out.filename
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
 }
 </script>
 
@@ -622,148 +380,98 @@ const downloadOutput = (out) => {
   color: #C0C5CE;
 }
 
-.hidden-input {
-  display: none;
-}
-
-// 对话框内容
 .tool-form {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
   padding: 4px 2px;
-
-  .form-field {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-
-    .form-label {
-      font-size: 14px;
-      font-weight: 500;
-      color: #374151;
-    }
-
-    .hint {
-      font-size: 12px;
-      color: #9CA3AF;
-    }
-  }
-
-  .file-picker {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-
-    .hint {
-      font-size: 12px;
-      color: #9CA3AF;
-    }
-
-    .selected-name {
-      display: inline-flex;
-      align-items: center;
-      font-size: 13px;
-      color: #374151;
-      background: #F3F4F6;
-      padding: 6px 12px;
-      border-radius: 8px;
-      max-width: 320px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-  }
-
-  .merge-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    max-height: 240px;
-    overflow-y: auto;
-
-    .merge-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 8px 10px;
-      background: #F9FAFB;
-      border: 1px solid #E5E7EB;
-      border-radius: 10px;
-
-      .merge-idx {
-        width: 22px;
-        height: 22px;
-        flex: 0 0 auto;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 12px;
-        font-weight: 600;
-        color: #4F6BFF;
-        background: rgba(79, 107, 255, 0.1);
-        border-radius: 6px;
-      }
-
-      .merge-name {
-        flex: 1;
-        min-width: 0;
-        font-size: 13px;
-        color: #374151;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      .merge-actions {
-        display: flex;
-        align-items: center;
-        flex: 0 0 auto;
-      }
-    }
-  }
 }
 
-.tool-results {
-  margin-top: 18px;
-  padding: 14px;
-  background: #F0FDF4;
-  border: 1px solid #BBF7D0;
-  border-radius: 12px;
+.tool-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
 
-  .results-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: #065F46;
-    margin-bottom: 10px;
-  }
-
-  .result-item {
+  .header-left {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 6px 0;
+  }
 
-    .result-icon {
-      color: #10B981;
+  .header-icon {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    font-size: 18px;
+  }
+
+  .header-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1f2937;
+  }
+
+  .header-close {
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+    color: #6b7280;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+
+    &:hover {
+      background: #fef2f2;
+      border-color: #fecaca;
+      color: #ef4444;
+      transform: rotate(90deg);
+      box-shadow: 0 3px 10px rgba(239, 68, 68, 0.18);
     }
 
-    .result-name {
-      flex: 1;
-      min-width: 0;
-      font-size: 13px;
-      color: #374151;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+    &:active {
+      transform: scale(0.92);
     }
   }
 }
+</style>
 
-.dialog-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
+<!-- 弹窗整体样式（teleport 到 body，使用非 scoped 样式覆盖） -->
+<style>
+.tool-dialog.el-dialog {
+  border-radius: 18px;
+  overflow: hidden;
+  background: #fbfdff;
+  box-shadow:
+    0 24px 64px rgba(17, 24, 39, 0.14),
+    0 4px 16px rgba(17, 24, 39, 0.08);
+}
+
+.tool-dialog .el-dialog__header {
+  margin-right: 0;
+  padding: 16px 20px;
+  border-bottom: 1px solid #eef2f7;
+  background: linear-gradient(135deg, #ffffff 0%, #f4f8ff 100%);
+}
+
+.tool-dialog .el-dialog__body {
+  padding: 20px;
+  background: #fbfdff;
+  border-radius: 0 0 18px 18px;
+}
+
+.tool-dialog .el-dialog__body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.tool-dialog .el-dialog__body::-webkit-scrollbar-thumb {
+  background: #d0d5dd;
+  border-radius: 3px;
 }
 </style>

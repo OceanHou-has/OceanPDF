@@ -50,13 +50,42 @@ export function mergePDFs(files) {
 /**
  * 拆分 PDF
  * @param {File} file
- * @param {{mode: string, spec?: string, every?: number}} params
+ * @param {{mode: string, spec?: string, every?: number, groupSpec?: string}} params
  */
 export function splitPDF(file, params = {}) {
   return uploadWithFields('/tools/split', file, {
     mode: params.mode || 'ranges',
     spec: params.spec,
-    every: params.every
+    every: params.every,
+    group_spec: params.groupSpec
+  })
+}
+
+/**
+ * 生成 PDF 页面预览（缩略图），用于可视化拆分
+ * @param {File} file
+ */
+export function previewPDF(file) {
+  const formData = new FormData()
+  formData.append('file', file)
+  return request({
+    url: '/tools/preview',
+    method: 'post',
+    data: formData,
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 600000
+  })
+}
+
+/**
+ * 将多个工具输出文件打包为 ZIP 一次性下载
+ * @param {string[]} filenames - 输出文件名列表
+ */
+export function downloadToolsZip(filenames) {
+  return request({
+    url: '/tools/download-zip',
+    method: 'post',
+    data: { filenames }
   })
 }
 
@@ -64,9 +93,13 @@ export function splitPDF(file, params = {}) {
  * 提取页面
  * @param {File} file
  * @param {string} spec - 页码范围，如 "1-3,5"
+ * @param {{preserveOrder?: boolean}} [options] - preserveOrder 为 true 时按 spec 顺序提取
  */
-export function extractPages(file, spec) {
-  return uploadWithFields('/tools/extract', file, { spec })
+export function extractPages(file, spec, options = {}) {
+  return uploadWithFields('/tools/extract', file, {
+    spec,
+    preserve_order: options.preserveOrder
+  })
 }
 
 /**
@@ -81,12 +114,13 @@ export function deletePages(file, spec) {
 /**
  * 旋转页面
  * @param {File} file
- * @param {{angle: number, pages?: string}} params
+ * @param {{angle: number, pages?: string, rotationMap?: string}} params - rotationMap 如 "1:90,3:180"
  */
 export function rotatePages(file, params = {}) {
   return uploadWithFields('/tools/rotate', file, {
     angle: params.angle,
-    pages: params.pages
+    pages: params.pages,
+    rotation_map: params.rotationMap
   })
 }
 

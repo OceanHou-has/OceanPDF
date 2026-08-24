@@ -3,7 +3,7 @@ PDF 工具 API 接口
 提供合并、拆分、提取、删除、旋转、重排等页面级工具。
 """
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, Body, HTTPException
 from fastapi.responses import FileResponse
 from typing import List, Optional
 from loguru import logger
@@ -52,12 +52,13 @@ async def split_pdf(
     mode: str = Form("ranges"),
     spec: Optional[str] = Form(None),
     every: Optional[int] = Form(None),
+    group_spec: Optional[str] = Form(None),
 ):
-    """拆分 PDF。``mode``: ranges(按范围) / every(每 N 页)。"""
+    """拆分 PDF。``mode``: ranges(按范围) / every(每 N 页)；``group_spec``: 如 "1-3|5,7"，每组一个文件。"""
     try:
         data = await file.read()
         outputs = PDFToolsService().split(
-            data, file.filename, mode=mode, spec=spec, every=every
+            data, file.filename, mode=mode, spec=spec, every=every, group_spec=group_spec
         )
         return _wrap(outputs)
     except HTTPException:
@@ -67,15 +68,53 @@ async def split_pdf(
         raise HTTPException(status_code=500, detail=f"拆分失败: {str(e)}")
 
 
+@router.post("/tools/preview")
+async def preview_pdf(file: UploadFile = File(...)):
+    """渲染 PDF 每页为缩略图，返回 base64 图片列表，用于可视化拆分。"""
+    try:
+        data = await file.read()
+        if not data:
+            raise HTTPException(status_code=400, detail="文件为空")
+        result = PDFToolsService().preview(data)
+        return {
+            "code": 200,
+            "message": "预览生成成功",
+            "data": result,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[PDF工具] 预览失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"预览失败: {str(e)}")
+
+
+@router.post("/tools/download-zip")
+async def download_tools_zip(filenames: List[str] = Body(..., embed=True)):
+    """将多个工具处理结果打包为 ZIP 一次性下载。"""
+    try:
+        if not filenames:
+            raise HTTPException(status_code=400, detail="请至少提供一个文件")
+        filename = PDFToolsService().zip_outputs(filenames)
+        return _wrap([filename])
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[PDF工具] 打包下载失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"打包失败: {str(e)}")
+
+
 @router.post("/tools/extract")
 async def extract_pages(
     file: UploadFile = File(...),
     spec: str = Form(...),
+    preserve_order: bool = Form(False),
 ):
-    """提取指定页面生成新 PDF。"""
+    """提取指定页面生成新 PDF。``preserve_order`` 为 True 时按 spec 顺序提取。"""
     try:
         data = await file.read()
-        outputs = PDFToolsService().extract(data, file.filename, spec)
+        outputs = PDFToolsService().extract(
+            data, file.filename, spec, preserve_order=preserve_order
+        )
         return _wrap(outputs)
     except HTTPException:
         raise
@@ -106,11 +145,14 @@ async def rotate_pages(
     file: UploadFile = File(...),
     angle: int = Form(...),
     pages: Optional[str] = Form(None),
+    rotation_map: Optional[str] = Form(None),
 ):
-    """旋转页面。``pages`` 为空时旋转全部页面。"""
+    """旋转页面。``pages`` 为空时旋转全部页面；``rotation_map`` 如 "1:90,3:180" 按页分别旋转。"""
     try:
         data = await file.read()
-        outputs = PDFToolsService().rotate(data, file.filename, angle, pages)
+        outputs = PDFToolsService().rotate(
+            data, file.filename, angle, pages, rotation_map=rotation_map
+        )
         return _wrap(outputs)
     except HTTPException:
         raise

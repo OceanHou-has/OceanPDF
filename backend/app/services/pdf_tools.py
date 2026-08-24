@@ -3,7 +3,10 @@ PDF 页面工具服务
 基于 PyMuPDF 提供合并、拆分、提取、删除、旋转、重排等页面级操作。
 """
 
+import base64
 import re
+import zipfile
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -15,6 +18,8 @@ class PDFToolsService:
     """PDF 页面级工具服务"""
 
     OUTPUT_DIR = Path("storage/outputs/tools")
+    MAX_PREVIEW_PAGES = 200
+    PREVIEW_SCALE = 0.4
 
     def __init__(self):
         self.output_dir = self.OUTPUT_DIR
@@ -101,36 +106,95 @@ class PDFToolsService:
         mode: str = "ranges",
         spec: Optional[str] = None,
         every: Optional[int] = None,
+        group_spec: Optional[str] = None,
     ) -> List[str]:
-        """拆分 PDF。``mode``: ranges(按范围) / every(每 N 页)。"""
+        """拆分 PDF。
+
+        - ``mode``: ranges(按范围) / every(每 N 页)
+        - ``group_spec``: 可视化分组拆分，如 "1-3|5,7"，每组生成一个文件（优先于 mode/spec）
+        """
         with fitz.open(stream=data, filetype="pdf") as doc:
             total = doc.page_count
-            if mode == "every":
+            if group_spec:
+                parts = [g for g in str(group_spec).split("|") if g.strip()]
+                if not parts:
+                    raise ValueError("未指定分组")
+                page_groups = [self._parse_pages(g, total) for g in parts]
+            elif mode == "every":
                 n = int(every or 1)
                 if n < 1:
                     raise ValueError("每 N 页的 N 必须 >= 1")
-                groups = [list(range(i, min(i + n, total))) for i in range(0, total, n)]
+                page_groups = [list(range(i, min(i + n, total))) for i in range(0, total, n)]
             else:
-                groups = [
+                page_groups = [
                     self._parse_pages(p, total)
                     for p in str(spec).split(",")
                     if p.strip()
                 ]
-            if not groups:
+            if not page_groups:
                 raise ValueError("未指定拆分范围")
 
         stem = self._safe_stem(original_name)
         outputs: List[str] = []
-        for i, pages in enumerate(groups, 1):
+        for i, pages in enumerate(page_groups, 1):
             with fitz.open(stream=data, filetype="pdf") as d:
                 d.select(pages)
                 outputs.append(self._save(d, f"{stem}_split_{i}.pdf"))
         return outputs
 
-    def extract(self, data: bytes, original_name: str, spec: str) -> List[str]:
-        """提取指定页面，合并为单个 PDF。"""
+    def preview(self, data: bytes) -> dict:
+        """渲染 PDF 每页为缩略图（base64 PNG），用于可视化拆分。"""
         with fitz.open(stream=data, filetype="pdf") as doc:
-            pages = self._parse_pages(spec, doc.page_count)
+            total = doc.page_count
+            if total > self.MAX_PREVIEW_PAGES:
+                raise ValueError(
+                    f"页数过多（{total} 页），最多支持 {self.MAX_PREVIEW_PAGES} 页预览，请使用手动输入模式"
+                )
+            pages = []
+            matrix = fitz.Matrix(self.PREVIEW_SCALE, self.PREVIEW_SCALE)
+            for i, page in enumerate(doc, 1):
+                pix = page.get_pixmap(matrix=matrix)
+                b64 = base64.b64encode(pix.tobytes("png")).decode("ascii")
+                pages.append(
+                    {
+                        "page": i,
+                        "image": f"data:image/png;base64,{b64}",
+                        "width": pix.width,
+                        "height": pix.height,
+                    }
+                )
+        return {"total_pages": total, "pages": pages}
+
+    def zip_outputs(self, filenames: List[str]) -> str:
+        """将多个输出文件打包为 ZIP，返回 zip 文件名。"""
+        zip_name = f"tools_batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+        zip_path = self.output_dir / zip_name
+        with zipfile.ZipFile(str(zip_path), "w", zipfile.ZIP_DEFLATED) as zf:
+            for name in filenames:
+                safe = Path(name).name
+                src = self.output_dir / safe
+                if not src.exists():
+                    raise ValueError(f"文件不存在: {safe}")
+                zf.write(str(src), arcname=safe)
+        logger.info(f"[PDFTools] 已打包: {zip_name} ({zip_path.stat().st_size} bytes)")
+        return zip_name
+
+    def extract(
+        self,
+        data: bytes,
+        original_name: str,
+        spec: str,
+        preserve_order: bool = False,
+    ) -> List[str]:
+        """提取指定页面，合并为单个 PDF。
+
+        ``preserve_order`` 为 True 时按 spec 给定顺序提取（等价于提取 + 重排）。
+        """
+        with fitz.open(stream=data, filetype="pdf") as doc:
+            if preserve_order:
+                pages = self._parse_order(spec, doc.page_count)
+            else:
+                pages = self._parse_pages(spec, doc.page_count)
             doc.select(pages)
             stem = self._safe_stem(original_name)
             return [self._save(doc, f"{stem}_extracted.pdf")]
@@ -153,18 +217,39 @@ class PDFToolsService:
         original_name: str,
         angle: int,
         pages_spec: Optional[str] = None,
+        rotation_map: Optional[str] = None,
     ) -> List[str]:
-        """旋转页面。``pages_spec`` 为空时旋转全部页面。"""
+        """旋转页面。
+
+        - ``pages_spec`` 为空时旋转全部页面
+        - ``rotation_map`` 如 "1:90,3:180" 时按页分别旋转（优先于 angle/pages_spec）
+        """
         angle = int(angle) % 360
         if angle not in (90, 180, 270):
             raise ValueError("旋转角度仅支持 90/180/270")
         with fitz.open(stream=data, filetype="pdf") as doc:
-            if pages_spec:
+            if rotation_map:
+                for item in str(rotation_map).split(","):
+                    part = item.strip()
+                    if not part:
+                        continue
+                    if ":" not in part:
+                        raise ValueError(f"无效的旋转配置: {part}")
+                    p_str, a_str = part.split(":", 1)
+                    p = int(p_str.strip())
+                    a = int(a_str.strip()) % 360
+                    if a not in (90, 180, 270):
+                        raise ValueError("旋转角度仅支持 90/180/270")
+                    if 1 <= p <= doc.page_count:
+                        doc[p - 1].set_rotation((doc[p - 1].rotation + a) % 360)
+            elif pages_spec:
                 pages = self._parse_pages(pages_spec, doc.page_count)
+                for p in pages:
+                    doc[p].set_rotation((doc[p].rotation + angle) % 360)
             else:
                 pages = list(range(doc.page_count))
-            for p in pages:
-                doc[p].set_rotation((doc[p].rotation + angle) % 360)
+                for p in pages:
+                    doc[p].set_rotation((doc[p].rotation + angle) % 360)
             stem = self._safe_stem(original_name)
             return [self._save(doc, f"{stem}_rotated.pdf")]
 

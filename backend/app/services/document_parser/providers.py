@@ -115,7 +115,7 @@ DOCUMENT_PARSER_PROVIDERS: List[Dict[str, Any]] = [
         "emoji": "🧠",
         "description": "智谱AI文档解析，基于GLM-OCR模型的版面分析与文本提取",
         "default_endpoint": "https://open.bigmodel.cn/api/paas/v4",
-        "key_url": "https://open.bigmodel.cn/usercenter/apikeys",
+        "key_url": "https://open.bigmodel.cn",
         "config_fields": [
             {
                 "key": "api_key",
