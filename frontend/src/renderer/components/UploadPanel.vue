@@ -81,7 +81,7 @@
               />
             </div>
           </div>
-          <div class="ocr-toggle">
+          <div v-if="selectedParser === 'dps'" class="ocr-toggle">
             <span class="ocr-label">OCR</span>
             <el-switch v-model="item.ocrEnabled" :disabled="uploading" />
           </div>

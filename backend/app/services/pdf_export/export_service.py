@@ -380,6 +380,7 @@ class PDFExportService:
             # 保存
             output_dir = Path(output_path).parent
             output_dir.mkdir(parents=True, exist_ok=True)
+            total_pages = len(source_doc)
             new_doc.save(output_path)
             
             source_doc.close()
@@ -391,7 +392,7 @@ class PDFExportService:
                 "success": True,
                 "output_path": output_path,
                 "mode": "translation_only",
-                "pages": len(source_doc)
+                "pages": total_pages
             }
             
         except Exception as e:
