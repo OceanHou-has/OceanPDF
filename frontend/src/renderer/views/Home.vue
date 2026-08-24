@@ -53,6 +53,8 @@
             <p class="page-desc">{{ pageDesc }}</p>
           </div>
           <div class="top-actions">
+            <!-- 自动更新按钮（发现新版本后显示，所有视图可见） -->
+            <UpdateButton class="update-button" />
             <div v-if="currentView === 'upload'" class="parallelism-setting">
               <span class="parallelism-label">并行度</span>
               <el-input-number v-model="parallelism" :min="1" :max="5" :step="1" />
@@ -244,6 +246,7 @@ import ParsedList from './ParsedList.vue'
 import Settings from './Settings.vue'
 import ToolsView from './Tools.vue'
 import Button1 from '../elements/button/button1.vue'
+import UpdateButton from '../components/UpdateButton.vue'
 import HelpDialog from '../components/dialogs/HelpDialog.vue'
 import waveIcon from '../elements/icon/海浪.svg'
 import { generatePretranslation, startTranslation, getApiKey, getMaxConcurrent } from '../api/pdf'

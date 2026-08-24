@@ -34,6 +34,64 @@ packaging/
 
 产物：`packaging\release\OceanPDF Setup 2.0.0.exe`（NSIS 安装包，约 120~150 MB）
 
+## 自动更新（GitHub Releases）
+
+应用内置了基于 **electron-updater** 的自动更新：启动 15 秒后自动检查 GitHub Releases，
+发现新版本时在主界面上方导航栏出现「新版本 vX.X.X」按钮（带红点提示），点击开始下载，
+按钮变为下载进度，下载完成后按钮变为绿色「重启安装」，点击后自动退出并完成升级。
+开发模式（`npm run electron:dev`）不会触发更新逻辑。
+
+### 发版流程（每次发布新版）
+
+1. 修改 `frontend/package.json` 的 `version`（例如 `2.0.1`），更新日志写在 GitHub Release 描述里
+   （会展示在应用内更新弹窗中）。
+2. 执行一键打包+发布（默认自动发布到 GitHub Releases）：
+
+```powershell
+.\packaging\build_all.ps1
+```
+
+electron-builder 会自动创建/更新 `v2.0.1` Release 并上传「exe + latest.yml + blockmap」三件套。
+同一个版本重复执行会覆盖更新该 Release 的资产；只想本地打包不发版时加参数：
+`.\packaging\build_all.ps1 -SkipPublish`。
+
+### 配置 GitHub Token（一次性）
+
+自动发布需要 electron-builder 以你的身份上传文件，在 PowerShell 里执行一次（把 token 换成你申请的，
+权限勾选 `repo`），之后重开终端即永久生效，无需再手动设置：
+
+```powershell
+[Environment]::SetEnvironmentVariable("GH_TOKEN", "你的token", "User")
+```
+
+注意：token 以明文存在当前 Windows 用户的注册表环境变量里，等效于本机密码，不要提交到 git、
+不要发给别人；如果是共用电脑建议改用 Windows 凭据管理器或每次执行时手动设置。
+
+不想用 token 也可以手动发布：本地跑 `.\packaging\build_all.ps1 -SkipPublish`，然后到
+GitHub Releases 页面手动新建 `v2.0.1` Release，把以下三个文件一起拖上去
+（文件名按 `latest.yml` 里的写法，空格已规范化为连字符）：
+
+- `packaging\release\OceanPDF-Setup-2.0.1.exe`
+- `packaging\release\latest.yml`
+- `packaging\release\OceanPDF-Setup-2.0.1.exe.blockmap`
+
+> ⚠️ **关键**：electron-updater 靠 Release 里的 `latest.yml` 判断新版本。
+> 如果手动往 GitHub Releases 拖 exe，**必须三件套一起传**，否则客户端永远检测不到更新。
+> 且手动上传时文件名要按 `latest.yml` 里的 `path`/`url` 命名
+> （electron-builder 会把空格规范化为连字符，如 `OceanPDF-Setup-2.0.0.exe`），否则下载 404。
+
+### 自动更新注意事项
+
+- **内置后端占用问题**：主进程在 `update:install` 时会先同步 `taskkill` 结束
+  `OceanPDFBackend.exe` 再退出安装，否则新安装包覆盖 `resources/backend` 时文件被锁定。
+  若之后发现更新安装失败，优先检查这一步。
+- **未代码签名**：更新安装时会再次触发 Windows SmartScreen「未知发布者」提示，点「仍要运行」即可；
+  建议后续补代码签名证书。
+- **自定义安装目录**：`allowToChangeInstallationDirectory: true` 下用户改了安装路径时，
+  建议装到自定义目录后实测一次更新。
+- **国内网络**：GitHub Releases 下载在国内可能慢/失败；如需改善，可将 `publish` 换成
+  `generic`（自建静态服务器）或给下载加代理。
+
 ## 分步打包 / 只重打某一部分
 
 ### 1. 只重打后端（修改了 backend/ 代码后）

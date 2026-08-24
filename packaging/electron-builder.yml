@@ -45,3 +45,11 @@ nsis:
   shortcutName: OceanPDF
   # 卸载时不删除用户数据（数据在 %APPDATA%/OceanPDF，本来也不在安装目录）
   deleteAppDataOnUninstall: false
+
+# 发布到 GitHub Releases（自动生成 latest.yml + blockmap，供 electron-updater 检测更新）
+# 发版命令：cd frontend && $env:GH_TOKEN="xxx" && npx electron-builder --config ..\packaging\electron-builder.yml --publish always
+publish:
+  provider: github
+  owner: OceanHou-has
+  repo: OceanPDF
+  releaseType: release
