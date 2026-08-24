@@ -193,27 +193,41 @@ function setupAutoUpdater() {
   // 当前应用版本（用于界面展示）
   ipcMain.handle('app:version', () => app.getVersion())
 
-  // 启动 15 秒后再检查，不拖慢首屏
-  setTimeout(() => {
-    quietErrors = true
-    // 注意：必须先 catch 消化错误，否则 rejection 会变成 unhandled rejection 把应用终止掉
-    autoUpdater.checkForUpdates().catch(() => {}).finally(() => {
-      quietErrors = false
-    })
-  }, 15000)
+  // 启动后立即检查更新：等渲染层加载完成（保证更新按钮已订阅事件）再发起，
+  // 稍等 1 秒作为缓冲，避免检查结果早于界面就绪而丢失
+  mainWindow?.webContents.once('did-finish-load', () => {
+    setTimeout(() => {
+      quietErrors = true
+      // 注意：必须先 catch 消化错误，否则 rejection 会变成 unhandled rejection 把应用终止掉
+      autoUpdater.checkForUpdates().catch(() => {}).finally(() => {
+        quietErrors = false
+      })
+    }, 1000)
+  })
 }
 
 // ==================== 窗口管理 ====================
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    // 还原（非最大化）时的窗口尺寸
+    width: 1488,
+    height: 876,
+    minWidth: 1000,
+    minHeight: 680,
+    show: false,   // 先隐藏，最大化完成后再显示，避免小窗口闪烁
     webPreferences: {
       preload: join(__dirname, './preload/index.cjs'),
       nodeIntegration: false,
       contextIsolation: true
     }
+  })
+
+  // 默认以最大化（占满屏幕）打开：等窗口就绪后再最大化并显示，
+  // 避免对未显示窗口调用 maximize 偶尔不生效的问题
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.maximize()
+    mainWindow.show()
   })
 
   // 外部链接用系统浏览器打开

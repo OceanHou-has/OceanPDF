@@ -36,7 +36,7 @@ packaging/
 
 ## 自动更新（GitHub Releases）
 
-应用内置了基于 **electron-updater** 的自动更新：启动 15 秒后自动检查 GitHub Releases，
+应用内置了基于 **electron-updater** 的自动更新：窗口打开后立即自动检查 GitHub Releases，
 发现新版本时在主界面上方导航栏出现「新版本 vX.X.X」按钮（带红点提示），点击开始下载，
 按钮变为下载进度，下载完成后按钮变为绿色「重启安装」，点击后自动退出并完成升级。
 开发模式（`npm run electron:dev`）不会触发更新逻辑。
