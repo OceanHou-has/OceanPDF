@@ -54,6 +54,7 @@ yarn-error.log*
 .env
 .env.local
 backend/.env
+命令.md
 
 # =========================
 # Database

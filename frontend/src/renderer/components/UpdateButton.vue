@@ -28,6 +28,8 @@ const percent = ref(0)
 let off = null
 
 onMounted(() => {
+  // 非 Electron 环境（如浏览器直接访问 Vite 页面）没有 electronAPI，静默跳过订阅
+  if (!window.electronAPI?.onUpdateEvent) return
   off = window.electronAPI.onUpdateEvent((e) => {
     switch (e.type) {
       case 'available':
@@ -74,6 +76,7 @@ const buttonTitle = computed(() => {
 })
 
 function handleClick() {
+  if (!window.electronAPI) return
   if (status.value === 'available') {
     status.value = 'downloading'
     percent.value = 0

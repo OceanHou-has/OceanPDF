@@ -333,10 +333,14 @@ class PDFExportService:
         translation_data: Dict
     ) -> Dict:
         """
-        创建纯译文PDF（只包含翻译内容，不包含原文）
+       创建纯译文PDF（只包含翻译内容，不包含原文）
+
+        以源页面为底稿：只擦除参与翻译的原文区域并绘制译文，保留图片、
+        表格线、公式等非文本内容（与覆盖/双语模式一致），避免仅译文导出
+        丢失版式内容。
         
         Args:
-            source_pdf_path: 源PDF路径（用于获取页面尺寸）
+            source_pdf_path: 源PDF路径
             output_path: 输出路径
             translation_data: 翻译数据
             
@@ -346,9 +350,10 @@ class PDFExportService:
         import fitz
         
         try:
-            # 打开源PDF获取页面尺寸
+            # 打开源PDF，并将源页面复制为新文档底稿
             source_doc = fitz.open(source_pdf_path)
             new_doc = fitz.open()
+            new_doc.insert_pdf(source_doc)
             
             translation_tasks = translation_data.get("translation_tasks", [])
             tasks_by_page = self.pdf_generator._group_tasks_by_page(translation_tasks)
@@ -356,32 +361,21 @@ class PDFExportService:
             # 自动注册字体
             self.font_manager.auto_register_fonts()
             
+            # 逐页擦除原文并绘制译文，保留图片/表格线/公式等非文本内容
             for page_num in range(len(source_doc)):
-                source_page = source_doc[page_num]
-                source_rect = source_page.rect
-                
-                # 创建新的空白页面
-                new_page = new_doc.new_page(
-                    width=source_rect.width,
-                    height=source_rect.height
-                )
-                
-                # 填充白色背景
-                shape = new_page.new_shape()
-                shape.draw_rect(source_rect)
-                shape.finish(color=None, fill=(1, 1, 1))
-                shape.commit()
-                
-                # 绘制译文
+                page = new_doc[page_num]
                 page_tasks = tasks_by_page.get(page_num, [])
-                for task in page_tasks:
-                    self.pdf_generator._render_task_to_page(new_page, task)
+                self.pdf_generator._render_translation_overlay_on_page(
+                    page,
+                    page_tasks,
+                    erase_source_text=True
+                )
             
             # 保存
             output_dir = Path(output_path).parent
             output_dir.mkdir(parents=True, exist_ok=True)
             total_pages = len(source_doc)
-            new_doc.save(output_path)
+            new_doc.save(output_path, garbage=4, deflate=True)
             
             source_doc.close()
             new_doc.close()

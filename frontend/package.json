@@ -1,6 +1,6 @@
 {
   "name": "oceanpdf-frontend",
-  "version": "2.0.2",
+  "version": "2.0.4",
   "description": "OceanPDF 2.0 桌面端PDF论文翻译软件",
   "main": "dist-electron/main.js",
   "type": "module",
