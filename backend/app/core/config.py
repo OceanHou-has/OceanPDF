@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     # DeepSeek API配置
     DEEPSEEK_API_KEY: Optional[str] = None
     DEEPSEEK_API_BASE: str = "https://api.deepseek.com"
-    DEEPSEEK_MODEL: str = "deepseek-chat"  # deepseek-chat 或 deepseek-reasoner
+    DEEPSEEK_MODEL: str = "deepseek-v4-flash"  # deepseek-v4-flash 或 deepseek-v4-pro（旧名已弃用）
     DEEPSEEK_TEMPERATURE: float = 0.3  # 翻译任务使用较低温度
     DEEPSEEK_MAX_TOKENS: int = 8192  # 单次请求最大token数
     DEEPSEEK_TIMEOUT: int = 180  # 请求超时时间（秒）

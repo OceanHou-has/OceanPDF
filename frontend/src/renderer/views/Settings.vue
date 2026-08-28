@@ -329,6 +329,54 @@ const FALLBACK_PROVIDERS = [
     key_url: 'https://platform.deepseek.com/api_keys'
   },
   {
+    id: 'qwen', name: '通义千问 (Qwen)',
+    description: '阿里云百炼 DashScope 兼容模式',
+    default_base_url: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    models: ['qwen3.7-max', 'qwen3.7-plus', 'qwen3.7-flash', 'qwen-max', 'qwen-plus', 'qwen-turbo'], default_model: 'qwen-plus',
+    key_placeholder: '输入阿里云百炼 API 密钥（sk-...）',
+    key_url: 'https://bailian.console.aliyun.com/'
+  },
+  {
+    id: 'doubao', name: '豆包 (Doubao)',
+    description: '火山引擎方舟平台，模型需先开通；可用完整版本化模型 ID 或推理接入点 ID（ep-...）',
+    default_base_url: 'https://ark.cn-beijing.volces.com/api/v3',
+    models: ['doubao-seed-2-1-pro-260628', 'doubao-seed-2-1-turbo-260628', 'doubao-seed-evolving'], default_model: 'doubao-seed-2-1-pro-260628',
+    key_placeholder: '输入火山方舟 API Key',
+    key_url: 'https://console.volcengine.com/ark'
+  },
+  {
+    id: 'google', name: 'Google Gemini',
+    description: '通过 Gemini OpenAI 兼容端点接入（可能需要代理）',
+    default_base_url: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+    models: ['gemini-3.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash'], default_model: 'gemini-3.5-flash',
+    key_placeholder: '输入 Google AI Studio API Key',
+    key_url: 'https://aistudio.google.com/apikey'
+  },
+  {
+    id: 'openai', name: 'OpenAI (GPT)',
+    description: 'OpenAI 官方接口（可能需要代理）',
+    default_base_url: 'https://api.openai.com/v1',
+    models: ['gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.6-sol', 'gpt-5.5', 'gpt-4o'], default_model: 'gpt-5.6-terra',
+    key_placeholder: '输入 OpenAI API Key（sk-...）',
+    key_url: 'https://platform.openai.com/api-keys'
+  },
+  {
+    id: 'moonshot', name: 'Moonshot (Kimi)',
+    description: '月之暗面 Kimi 开放平台',
+    default_base_url: 'https://api.moonshot.cn/v1',
+    models: ['kimi-k3', 'kimi-k2.6', 'kimi-k2.7-code', 'kimi-k2.7-code-highspeed'], default_model: 'kimi-k3',
+    key_placeholder: '输入 Moonshot API Key',
+    key_url: 'https://platform.moonshot.cn/'
+  },
+  {
+    id: 'zhipu', name: '智谱 GLM',
+    description: '智谱 AI 开放平台',
+    default_base_url: 'https://open.bigmodel.cn/api/paas/v4',
+    models: ['glm-5.3', 'glm-5.2', 'glm-5.2-highspeed', 'glm-4-plus', 'glm-4-flash'], default_model: 'glm-5.3',
+    key_placeholder: '输入智谱 API Key',
+    key_url: 'https://open.bigmodel.cn/'
+  },
+  {
     id: 'custom', name: '自定义 (OpenAI 兼容)',
     description: '任意 OpenAI 兼容服务（如 Ollama、OneAPI、中转站等）',
     default_base_url: '', models: [], default_model: '',
@@ -351,7 +399,35 @@ function selectLlmProvider(p) {
   form.value.provider = p.id
   form.value.baseUrl = p.default_base_url || ''
   form.value.model = p.default_model || ''
+  form.value.apiKey = ''
   resetTestConn()
+  // 加载该厂商独立保存的配置（Key / 接口 / 模型）
+  loadLlmProviderConfig(p.id)
+}
+
+// 加载指定厂商独立保存的翻译模型配置
+async function loadLlmProviderConfig(providerId) {
+  try {
+    const res = await getTranslationModelConfig(providerId)
+    if (res?.code === 200 && res.data) {
+      // 防止快速切换厂商时旧响应覆盖当前表单
+      if (form.value.provider !== providerId) return
+      const saved = res.data
+      if (saved.base_url) form.value.baseUrl = saved.base_url
+      if (saved.model) {
+        // 已保存模型若已不在厂商列表（如旧的点号模型名），自动回退到厂商默认
+        const provider = llmProviders.value.find(p => p.id === providerId)
+        if (provider?.models?.length && !provider.models.includes(saved.model)) {
+          form.value.model = provider.default_model || ''
+        } else {
+          form.value.model = saved.model
+        }
+      }
+      form.value.apiKey = saved.api_key || ''
+    }
+  } catch (error) {
+    console.error(`加载 ${providerId} 翻译配置失败:`, error)
+  }
 }
 
 // 测试连接
@@ -436,6 +512,13 @@ const isSavingParser = ref(false)
 const parserTestResult = ref(null)
 const defaultParser = ref('dps')
 const isSavingDefaultParser = ref(false)
+const PARSER_DEFAULT_CHANGED_EVENT = 'oceanpdf:document-parser-default:changed'
+
+function notifyDefaultParserChanged(providerId) {
+  window.dispatchEvent(new CustomEvent(PARSER_DEFAULT_CHANGED_EVENT, {
+    detail: { providerId }
+  }))
+}
 
 const configuredCount = computed(() => providers.value.filter(p => isProviderConfigured(p.id)).length)
 const totalServices = computed(() => providers.value.length)
@@ -495,6 +578,7 @@ async function handleDefaultParserChange(value) {
   try {
     const res = await saveDefaultParser(value)
     if (res?.code === 200) {
+      notifyDefaultParserChanged(value)
       window.$toast?.success('默认解析服务已保存，上传翻译时将自动使用')
     } else {
       window.$toast?.error(res?.message || '默认解析服务设置失败')
@@ -565,6 +649,7 @@ async function handleDeleteParser() {
       // 删除的是当前默认服务时，后端已回退默认到本地DPS，前端同步
       if (defaultParser.value === selectedProvider.value.id) {
         defaultParser.value = 'dps'
+        notifyDefaultParserChanged('dps')
       }
       Object.keys(parserFormConfig).forEach(key => delete parserFormConfig[key])
       parserTestResult.value = null

@@ -8,6 +8,8 @@ from typing import Dict, Any
 import aiohttp
 from loguru import logger
 
+from app.services.dps_service import DPSService
+
 
 # 1x1 白色 PNG 图片（base64），用于轻量级连通性测试
 TINY_PNG_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
@@ -15,6 +17,28 @@ TINY_PNG_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+h
 
 def _result(success: bool, message: str, latency_ms: float) -> Dict[str, Any]:
     return {"success": success, "message": message, "latency_ms": round(latency_ms, 1)}
+
+
+async def test_dps(with_ocr: bool = False) -> Dict[str, Any]:
+    """检查本地 DPS 服务及本次解析所需的模型是否就绪。"""
+    t0 = time.monotonic()
+    try:
+        health = await DPSService().check_health(need_ocr=with_ocr)
+        model_name = "版面模型和 OCR 模型" if with_ocr else "版面模型"
+        result = _result(
+            True,
+            f"本地 DPS 连接正常，{model_name}已就绪",
+            (time.monotonic() - t0) * 1000,
+        )
+        result["health"] = health
+        return result
+    except Exception as e:
+        detail = str(e).strip() or type(e).__name__
+        if detail.startswith("DPS模型未就绪"):
+            message = detail
+        else:
+            message = f"本地 DPS 健康检查失败：{detail}。请确认 DPS 服务已启动后重试"
+        return _result(False, message, (time.monotonic() - t0) * 1000)
 
 
 async def test_baidu(api_key: str, secret_key: str) -> Dict[str, Any]:
@@ -334,10 +358,19 @@ TEST_FUNCTIONS = {
 }
 
 
-async def test_connectivity(provider_id: str, config: Dict[str, Any]) -> Dict[str, Any]:
+async def test_connectivity(
+    provider_id: str,
+    config: Dict[str, Any],
+    *,
+    with_ocr: bool = False,
+) -> Dict[str, Any]:
     """
     统一连通性测试入口
     """
+    if provider_id == "dps":
+        logger.info(f"[文档解析] 检查本地 DPS 健康状态: OCR={with_ocr}")
+        return await test_dps(with_ocr=with_ocr)
+
     test_func = TEST_FUNCTIONS.get(provider_id)
     if not test_func:
         return _result(False, f"未知的服务ID: {provider_id}", 0)

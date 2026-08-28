@@ -330,12 +330,14 @@ export function saveTranslationModelConfig(data) {
 
 /**
  * 获取已保存的翻译模型配置
+ * @param {string} [provider] - 厂商ID，缺省返回最近一次保存的配置
  * @returns {Promise}
  */
-export function getTranslationModelConfig() {
+export function getTranslationModelConfig(provider) {
   return request({
     url: '/translation/config/model-config',
-    method: 'get'
+    method: 'get',
+    params: provider ? { provider } : undefined
   })
 }
 
@@ -364,6 +366,7 @@ export function getPretranslationTasks(pdfName, useDps = false) {
  * @param {string} [data.provider] - 大模型厂商ID
  * @param {string} [data.base_url] - OpenAI兼容接口地址
  * @param {string} [data.model] - 模型名称
+ * @param {'all'|'failed'|'unfinished'} [data.task_scope] - all=整篇，failed=失败项，unfinished=未完成项
  * @returns {Promise}
  */
 export function startTranslation(data) {
@@ -632,15 +635,18 @@ export function saveDocumentParserConfig(providerId, config) {
  * 测试文档解析服务连通性
  * @param {string} providerId - 服务ID
  * @param {Object} config - 配置内容（可选）
+ * @param {Object} options - 检测选项
+ * @param {boolean} options.withOcr - 本地DPS是否要求OCR模型就绪
  * @returns {Promise}
  */
-export function testDocumentParser(providerId, config = {}) {
+export function testDocumentParser(providerId, config = {}, options = {}) {
   return request({
     url: '/document-parser/test',
     method: 'post',
     data: {
       provider_id: providerId,
-      config: config
+      config: config,
+      with_ocr: Boolean(options.withOcr)
     },
     timeout: 30000 // 测试可能需要较长时间
   })

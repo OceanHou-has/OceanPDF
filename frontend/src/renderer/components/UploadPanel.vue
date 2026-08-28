@@ -104,7 +104,7 @@
           :loading="uploading"
           @click="handleUpload"
         >
-          {{ uploading ? '解析中...' : items.length === 1 ? '开始翻译' : '开始批量解析' }}
+          {{ actionButtonText }}
         </el-button>
         <el-button size="large" :disabled="uploading" @click="clearAll">
           清空列表
@@ -116,14 +116,15 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { UploadFilled, Document, Delete, Plus } from '@element-plus/icons-vue'
-import { uploadPDF, getDocumentParserStatus, getDefaultParser } from '../api/pdf'
+import { uploadPDF, getDocumentParserStatus, getDefaultParser, testDocumentParser } from '../api/pdf'
 
 const router = useRouter()
 const uploadRef = ref(null)
 const uploading = ref(false)
+const preflighting = ref(false)
 
 // 版面分析服务选择（dps=本地DPS，其余为外部服务ID）
 const selectedParser = ref('dps')
@@ -131,6 +132,7 @@ const externalParsers = ref([])
 
 // 当前仅智谱GLM-OCR已接入，其余外部服务暂未开放选择
 const ENABLED_PARSER_IDS = ['zhipu']
+const PARSER_DEFAULT_CHANGED_EVENT = 'oceanpdf:document-parser-default:changed'
 const isParserEnabled = (id) => ENABLED_PARSER_IDS.includes(id)
 
 const loadParserStatus = async () => {
@@ -153,8 +155,24 @@ const loadParserStatus = async () => {
   }
 }
 
+const handleDefaultParserChanged = (event) => {
+  if (!uploading.value) {
+    const providerId = event?.detail?.providerId
+    if (providerId === 'dps' || isParserEnabled(providerId)) {
+      // 先立即更新界面，再从后端刷新配置状态进行校验。
+      selectedParser.value = providerId
+    }
+    loadParserStatus()
+  }
+}
+
 onMounted(() => {
   loadParserStatus()
+  window.addEventListener(PARSER_DEFAULT_CHANGED_EVENT, handleDefaultParserChanged)
+})
+
+onUnmounted(() => {
+  window.removeEventListener(PARSER_DEFAULT_CHANGED_EVENT, handleDefaultParserChanged)
 })
 
 const props = defineProps({
@@ -184,6 +202,12 @@ const items = computed(() => {
     it.progressVisible = progressVisible
     return it
   })
+})
+
+const actionButtonText = computed(() => {
+  if (preflighting.value) return '检测解析服务...'
+  if (uploading.value) return '解析中...'
+  return items.value.length === 1 ? '开始翻译' : '开始批量解析'
 })
 
 // 进度条颜色
@@ -432,11 +456,28 @@ const handleUpload = async () => {
     return
   }
 
+  const targets = rawItems.value.filter((it) => it.status === 'pending' || it.status === 'error')
+  if (targets.length === 0) {
+    window.$toast?.warning('没有待解析的文件')
+    return
+  }
+
   uploading.value = true
-  
+
   try {
+    // 文件上传前统一预检一次。DPS 按本批任务实际需求检查 OCR 模型，
+    // 外部服务则使用已保存配置发起轻量级连通性测试。
+    preflighting.value = true
+    const withOcr = selectedParser.value === 'dps' && targets.some((item) => item.ocrEnabled)
+    const connectivity = await testDocumentParser(
+      selectedParser.value,
+      {},
+      { withOcr }
+    )
+    preflighting.value = false
+    console.log('[UploadPanel] 解析服务预检通过:', connectivity?.data)
+
     const concurrency = clampParallelism()
-    const targets = rawItems.value.filter((it) => it.status === 'pending' || it.status === 'error')
     console.log('[UploadPanel] 批量解析启动:', {
       total: rawItems.value.length,
       targets: targets.length,
@@ -489,9 +530,11 @@ const handleUpload = async () => {
     emit('go-parsed')
     
   } catch (error) {
-    window.$toast?.error('上传失败：' + (error.message || '未知错误'))
-    console.error('上传错误:', error)
+    const prefix = preflighting.value ? '解析服务不可用：' : '上传失败：'
+    window.$toast?.error(prefix + (error.message || '未知错误'))
+    console.error(preflighting.value ? '解析服务预检失败:' : '上传错误:', error)
   } finally {
+    preflighting.value = false
     uploading.value = false
   }
 }

@@ -4,6 +4,7 @@
 """
 import json
 import asyncio
+import copy
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from datetime import datetime
@@ -126,7 +127,8 @@ class TranslationTaskService:
         enable_distribution: bool = True,
         progress_callback: Optional[callable] = None,
         control_flags: Optional[Dict] = None,  # 【新增】控制标志
-        llm_config: Optional[Dict] = None  # 【新增】大模型厂商配置
+        llm_config: Optional[Dict] = None,  # 【新增】大模型厂商配置
+        task_scope: str = "all",
     ) -> Dict[str, Any]:
         """
         异步翻译整个PDF（分两阶段：翻译 + 译文分配）
@@ -140,11 +142,15 @@ class TranslationTaskService:
             progress_callback: 进度回调函数
             control_flags: 控制标志 {"paused": bool, "stopped": bool}
             llm_config: 大模型配置 {"provider": str, "base_url": str, "model": str}
+            task_scope: all=整篇重新翻译，failed=仅失败任务，unfinished=仅未完成任务
             
         Returns:
             翻译结果
         """
         try:
+            if task_scope not in {"all", "failed", "unfinished"}:
+                return {"success": False, "error": f"不支持的任务范围: {task_scope}"}
+
             # 1. 加载预翻译数据
             pretrans_data = self.load_pretranslation_data(pdf_name, use_dps)
             if not pretrans_data:
@@ -161,7 +167,19 @@ class TranslationTaskService:
             )
             
             # 3. 准备翻译任务
-            translation_tasks = pretrans_data.get("translation_tasks", [])
+            pretranslation_tasks = pretrans_data.get("translation_tasks", [])
+            if task_scope in {"failed", "unfinished"}:
+                existing_result = self.get_translation_result(pdf_name, use_dps)
+                existing_tasks = (existing_result or {}).get("translation_tasks", [])
+                if not existing_tasks:
+                    return {
+                        "success": False,
+                        "error": "没有可供重试的历史翻译结果",
+                    }
+                translation_tasks = copy.deepcopy(existing_tasks)
+            else:
+                translation_tasks = copy.deepcopy(pretranslation_tasks)
+
             if not translation_tasks:
                 return {
                     "success": False,
@@ -177,11 +195,31 @@ class TranslationTaskService:
                 f"译文分配={'启用' if enable_distribution else '禁用'}"
             )
             
-            # 4. 筛选需要翻译的任务
-            tasks_to_translate = [
+            # 4. 筛选需要翻译的任务。失败重试同时覆盖翻译失败和聚合译文分配失败；
+            # 未失败的历史任务保持原状态及译文不变。
+            all_translatable_tasks = [
                 task for task in translation_tasks
                 if task.get("translate", True)
             ]
+
+            if task_scope == "failed":
+                tasks_to_translate = [
+                    task for task in all_translatable_tasks
+                    if task.get("translation_status") == "failed"
+                    or task.get("distribution_status") == "failed"
+                ]
+            elif task_scope == "unfinished":
+                tasks_to_translate = [
+                    task for task in all_translatable_tasks
+                    if task.get("translation_status") not in {"success", "failed"}
+                    or (
+                        task.get("is_aggregated")
+                        and task.get("translation_status") == "success"
+                        and task.get("distribution_status") not in {"success", "failed"}
+                    )
+                ]
+            else:
+                tasks_to_translate = all_translatable_tasks
             
             logger.info(f"共 {len(tasks_to_translate)} 个任务需要翻译")
 
@@ -189,26 +227,39 @@ class TranslationTaskService:
             tasks_to_translate_ids = {t.get("task_id") for t in tasks_to_translate if t.get("task_id")}
 
             for task in translation_tasks:
-                if task.get("task_id") not in tasks_to_translate_ids:
+                task_id = task.get("task_id")
+                if task_scope == "all" and task_id not in tasks_to_translate_ids:
                     task["translation_status"] = "skipped"
-                else:
+                elif task_id in tasks_to_translate_ids:
                     task["translation_status"] = "pending"
-                if "translation_error" in task:
                     task.pop("translation_error", None)
+                    task.pop("translation_attempts", None)
+                    task.pop("translation_retry_count", None)
+                    task.pop("translated_text", None)
 
-                if task.get("is_aggregated") and task.get("aggregated_blocks"):
+                if task_id in tasks_to_translate_ids and task.get("is_aggregated") and task.get("aggregated_blocks"):
                     for block in task["aggregated_blocks"]:
-                        if "translated_text" in block:
-                            block["translated_text"] = block.get("translated_text")
-                if "distribution_status" in task:
+                        block.pop("translated_text", None)
+                if task_id in tasks_to_translate_ids:
                     task.pop("distribution_status", None)
-                if "distribution_error" in task:
                     task.pop("distribution_error", None)
 
-            translation_success = 0
-            translation_failed = 0
-            distribution_success = 0
-            distribution_failed = 0
+            translation_success = sum(
+                1 for task in all_translatable_tasks
+                if task.get("translation_status") == "success"
+            )
+            translation_failed = sum(
+                1 for task in all_translatable_tasks
+                if task.get("translation_status") == "failed"
+            )
+            distribution_success = sum(
+                1 for task in all_translatable_tasks
+                if task.get("distribution_status") == "success"
+            )
+            distribution_failed = sum(
+                1 for task in all_translatable_tasks
+                if task.get("distribution_status") == "failed"
+            )
             translated_task_ids: set[str] = set()
             distributed_task_ids: set[str] = set()
 
@@ -218,10 +269,13 @@ class TranslationTaskService:
                 "target_lang": target_lang,
                 "parse_mode": "dps" if use_dps else "python",
                 "translated_at": datetime.now().isoformat(),
+                "stopped": False,
                 "enable_distribution": enable_distribution,
                 "statistics": {
                     "total_tasks": len(translation_tasks),
-                    "translated_tasks": len(tasks_to_translate),
+                    "translated_tasks": len(all_translatable_tasks),
+                    "rerun_tasks": len(tasks_to_translate),
+                    "task_scope": task_scope,
                     "translation_success": 0,
                     "translation_failed": 0,
                     "distribution_success": 0,
@@ -258,6 +312,8 @@ class TranslationTaskService:
                                 if task:
                                     task["translated_text"] = result.get("translated_text")
                                     task["translation_status"] = status
+                                    task["translation_attempts"] = result.get("attempts", 1)
+                                    task["translation_retry_count"] = result.get("retry_count", 0)
                                     if result.get("error"):
                                         task["translation_error"] = result.get("error")
                                     else:
@@ -321,7 +377,8 @@ class TranslationTaskService:
                 translation_result["statistics"]["distribution_success"] = distribution_success
                 translation_result["statistics"]["distribution_failed"] = distribution_failed
                 translation_result["statistics"]["overall_success_rate"] = (
-                    f"{(translation_success / len(tasks_to_translate) * 100):.2f}%" if tasks_to_translate else "0%"
+                    f"{(translation_success / len(all_translatable_tasks) * 100):.2f}%"
+                    if all_translatable_tasks else "0%"
                 )
 
                 if updated:
@@ -362,6 +419,8 @@ class TranslationTaskService:
             active_translation: set[asyncio.Task] = set()
             active_distribution: set[asyncio.Task] = set()
             task_meta: Dict[asyncio.Task, Dict[str, Any]] = {}
+            if control_flags is not None:
+                control_flags["active_tasks"] = set()
 
             distribution_max_concurrent = min(3, max_concurrent) if enable_distribution else 0
             translate_index = 0
@@ -470,6 +529,8 @@ class TranslationTaskService:
                     dist_task = distribution_queue.pop(0)
                     job = asyncio.create_task(run_distribution_job(dist_task))
                     active_distribution.add(job)
+                    if control_flags is not None:
+                        control_flags["active_tasks"].add(job)
                     task_meta[job] = {"job_type": "distribution", "task": dist_task}
                     remaining_capacity -= 1
 
@@ -478,6 +539,8 @@ class TranslationTaskService:
                     translate_index += 1
                     job = asyncio.create_task(run_translate_job(t))
                     active_translation.add(job)
+                    if control_flags is not None:
+                        control_flags["active_tasks"].add(job)
                     task_meta[job] = {"job_type": "translation", "task": t}
                     remaining_capacity -= 1
 
@@ -497,6 +560,8 @@ class TranslationTaskService:
                         active_translation.discard(finished)
                     elif job_type == "distribution":
                         active_distribution.discard(finished)
+                    if control_flags is not None:
+                        control_flags.get("active_tasks", set()).discard(finished)
 
                     try:
                         result = await finished
@@ -575,11 +640,16 @@ class TranslationTaskService:
             
             # 10. 构建完整翻译结果
             translation_result["translated_at"] = datetime.now().isoformat()
+            was_stopped = bool(control_flags and control_flags.get("stopped"))
+            translation_result["stopped"] = was_stopped
             translation_result["statistics"]["translation_success"] = translation_success
             translation_result["statistics"]["translation_failed"] = translation_failed
             translation_result["statistics"]["distribution_success"] = distribution_success
             translation_result["statistics"]["distribution_failed"] = distribution_failed
-            translation_result["statistics"]["overall_success_rate"] = f"{(success_count / len(tasks_to_translate) * 100):.2f}%" if tasks_to_translate else "0%"
+            translation_result["statistics"]["overall_success_rate"] = (
+                f"{(success_count / len(all_translatable_tasks) * 100):.2f}%"
+                if all_translatable_tasks else "0%"
+            )
             
             # 11. 保存翻译结果
             if not self.save_translation_result(pdf_name, translation_result, use_dps):
@@ -593,7 +663,8 @@ class TranslationTaskService:
             return {
                 "success": True,
                 "data": translation_result["statistics"],
-                "file_path": str(self.get_translation_result_path(pdf_name, use_dps))
+                "file_path": str(self.get_translation_result_path(pdf_name, use_dps)),
+                "stopped": was_stopped,
             }
             
         except Exception as e:
@@ -611,7 +682,8 @@ class TranslationTaskService:
         max_concurrent: int = 5,
         enable_distribution: bool = True,
         progress_callback: Optional[callable] = None,
-        llm_config: Optional[Dict] = None
+        llm_config: Optional[Dict] = None,
+        task_scope: str = "all",
     ) -> Dict[str, Any]:
         """
         同步翻译整个PDF（内部调用异步方法）
@@ -624,6 +696,7 @@ class TranslationTaskService:
             enable_distribution: 是否启用译文分配
             progress_callback: 进度回调函数
             llm_config: 大模型配置 {"provider": str, "base_url": str, "model": str}
+            task_scope: all=整篇重新翻译，failed=仅失败任务，unfinished=仅未完成任务
             
         Returns:
             翻译结果
@@ -650,7 +723,8 @@ class TranslationTaskService:
                             max_concurrent=max_concurrent,
                             enable_distribution=enable_distribution,
                             progress_callback=progress_callback,
-                            llm_config=llm_config
+                            llm_config=llm_config,
+                            task_scope=task_scope,
                         )
                     )
                     return future.result()
@@ -664,7 +738,8 @@ class TranslationTaskService:
                         max_concurrent=max_concurrent,
                         enable_distribution=enable_distribution,
                         progress_callback=progress_callback,
-                        llm_config=llm_config
+                        llm_config=llm_config,
+                        task_scope=task_scope,
                     )
                 )
         except RuntimeError:
@@ -677,7 +752,8 @@ class TranslationTaskService:
                     max_concurrent=max_concurrent,
                     enable_distribution=enable_distribution,
                     progress_callback=progress_callback,
-                    llm_config=llm_config
+                    llm_config=llm_config,
+                    task_scope=task_scope,
                 )
             )
     

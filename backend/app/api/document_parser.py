@@ -51,7 +51,8 @@ class SaveConfigRequest(BaseModel):
 class TestConnectionRequest(BaseModel):
     """测试连通性请求"""
     provider_id: str = Field(..., description="服务ID")
-    config: Dict[str, str] = Field(..., description="配置内容（可选，不传则使用已保存配置）")
+    config: Dict[str, str] = Field(default_factory=dict, description="配置内容（可选，不传则使用已保存配置）")
+    with_ocr: bool = Field(False, description="本地DPS健康检查时是否要求OCR模型就绪")
 
 
 class SetDefaultParserRequest(BaseModel):
@@ -191,6 +192,19 @@ async def test_connection(request: TestConnectionRequest):
     测试文档解析服务连通性
     """
     try:
+        # 本地 DPS 无需供应商配置，直接检查 /health 及本次任务所需模型。
+        if request.provider_id == LOCAL_PARSER_ID:
+            result = await test_connectivity(
+                request.provider_id,
+                {},
+                with_ocr=request.with_ocr,
+            )
+            return {
+                "code": 200 if result["success"] else 500,
+                "message": result["message"],
+                "data": result,
+            }
+
         provider = get_provider(request.provider_id)
         if not provider:
             raise HTTPException(status_code=400, detail=f"未知的服务ID: {request.provider_id}")

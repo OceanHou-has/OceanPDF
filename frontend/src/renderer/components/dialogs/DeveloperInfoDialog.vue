@@ -79,7 +79,33 @@
         </div>
         <p class="qr-tip">💡 点击二维码可放大查看</p>
       </div>
+
+      <!-- 右下角彩蛋按钮 -->
+      <button
+        class="easter-btn"
+        @click="uselessVisible = true"
+        title="?"
+        aria-label="隐藏彩蛋按钮"
+      >
+        <span>?</span>
+      </button>
     </div>
+
+    <!-- 彩蛋提示弹窗 -->
+    <el-dialog
+      v-model="uselessVisible"
+      width="300px"
+      :show-header="false"
+      :close-on-click-modal="true"
+      class="useless-dialog"
+      append-to-body
+    >
+      <div class="useless-content">
+        <div class="useless-icon" aria-hidden="true">🐋</div>
+        <p class="useless-text">这个按钮并没有什么用~</p>
+        <button class="useless-ok" @click="uselessVisible = false">知道了</button>
+      </div>
+    </el-dialog>
   </el-dialog>
 </template>
 
@@ -103,6 +129,9 @@ const dialogVisible = computed({
   set: (value) => emit('update:modelValue', value)
 })
 
+// 彩蛋弹窗
+const uselessVisible = ref(false)
+
 // 开发者信息
 const email = '18734341769@163.com'
 const qrPreviewList = [wechatQr, alipayQr]
@@ -110,6 +139,7 @@ const qrPreviewList = [wechatQr, alipayQr]
 
 <style scoped lang="scss">
 .dev-wrap {
+  position: relative;
   padding: 28px 32px 32px;
   background: linear-gradient(160deg, #F8FAFF 0%, #FFFFFF 55%, #FDF6FF 100%);
   border-radius: 12px;
@@ -322,6 +352,68 @@ const qrPreviewList = [wechatQr, alipayQr]
     margin: 14px 0 0 0;
     font-size: 12px;
     color: #9CA3AF;
+  }
+}
+
+.easter-btn {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: rgba(79, 107, 255, 0.08);
+  color: #9CA3AF;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: #4F6BFF;
+    color: #FFFFFF;
+  }
+}
+
+.useless-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 8px 8px;
+  text-align: center;
+
+  .useless-icon {
+    font-size: 40px;
+    line-height: 1;
+  }
+
+  .useless-text {
+    margin: 0;
+    font-size: 15px;
+    color: #374151;
+    line-height: 1.6;
+  }
+
+  .useless-ok {
+    margin-top: 6px;
+    padding: 8px 26px;
+    border: none;
+    border-radius: 20px;
+    background: linear-gradient(135deg, #4F6BFF 0%, #8B5CF6 100%);
+    color: #FFFFFF;
+    font-size: 14px;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+
+    &:hover {
+      opacity: 0.85;
+    }
   }
 }
 </style>
