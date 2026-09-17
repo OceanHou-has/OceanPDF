@@ -45,6 +45,14 @@ export default defineConfig({
       }
     },
     plugins: [vue()],
+    // 使用 Sass 现代编译 API，避免 Dart Sass 的 legacy-js-api 弃用警告
+    css: {
+      preprocessorOptions: {
+        scss: {
+          api: 'modern'
+        }
+      }
+    },
     build: {
       outDir: 'dist-electron/renderer',
       emptyOutDir: false,
