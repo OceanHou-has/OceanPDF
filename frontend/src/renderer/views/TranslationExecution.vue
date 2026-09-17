@@ -23,6 +23,30 @@
             <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </Button1>
+        <button
+          v-if="isCompleted && hasFailedTasks"
+          class="translation-action-btn retry-failed-btn"
+          type="button"
+          @click="openTranslationAction('retry-failed')"
+        >
+          重试失败项
+        </button>
+        <button
+          v-if="isStopped"
+          class="translation-action-btn continue-btn"
+          type="button"
+          @click="openTranslationAction('continue')"
+        >
+          继续未完成任务
+        </button>
+        <button
+          v-if="isCompleted || isStopped"
+          class="translation-action-btn retranslate-btn"
+          type="button"
+          @click="openTranslationAction('retranslate')"
+        >
+          重新翻译
+        </button>
         <Button1 class="nav-btn" size="icon" @click="handlePause" v-if="!isPaused && isTranslating" aria-label="暂停" title="暂停">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
             <path d="M10 4H6v16h4V4zM18 4h-4v16h4V4z" fill="currentColor"/>
@@ -33,7 +57,7 @@
             <path d="M8 5v14l11-7z" fill="currentColor"/>
           </svg>
         </Button1>
-        <Button1 class="nav-btn" size="icon" @click="handleStop" v-if="isTranslating" aria-label="停止" title="停止">
+        <Button1 class="nav-btn" size="icon" @click="handleStop" v-if="isTranslating || isPaused" aria-label="停止" title="停止">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
             <rect x="6" y="6" width="12" height="12" fill="currentColor"/>
           </svg>
@@ -47,7 +71,7 @@
     </div>
 
     <!-- 进度信息栏 -->
-    <div class="progress-bar" v-if="isTranslating || isPaused || isCompleted">
+    <div class="progress-bar" v-if="isTranslating || isPaused || isCompleted || isStopped">
       <div class="progress-info">
         <span class="progress-text">{{ progressMessage }}</span>
         <span class="progress-count">{{ currentCount }} / {{ totalCount }}</span>
@@ -182,6 +206,12 @@
       :pdf-names="[pdfName]"
       :use-dps="useDps"
     />
+    <TranslationConfigDialog
+      v-model="translationConfigVisible"
+      :pdf-name="pdfName"
+      :action-mode="translationActionMode"
+      @submit="handleTranslationActionSubmit"
+    />
   </div>
 </template>
 
@@ -190,6 +220,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button1 from '../elements/button/button1.vue'
 import PdfExportDialog from '../components/PdfExportDialog.vue'
+import TranslationConfigDialog from '../components/dialogs/TranslationConfigDialog.vue'
 import { 
   generatePretranslation, 
   startTranslation, 
@@ -230,6 +261,7 @@ const clampMaxConcurrent = (val) => {
 const isTranslating = ref(false)
 const isCompleted = ref(false)
 const isPaused = ref(false)
+const isStopped = ref(false)
 const isRefreshing = ref(false)  // 新增：刷新状态
 const progressPercent = ref(0)
 const progressMessage = ref('准备中...')
@@ -243,6 +275,9 @@ const translationSuccess = ref(0)  // 翻译成功数
 const translationFailed = ref(0)   // 翻译失败数
 const distributionSuccess = ref(0) // 分配成功数
 const distributionFailed = ref(0)  // 分配失败数
+const hasFailedTasks = computed(() => translationFailed.value > 0 || distributionFailed.value > 0)
+const translationConfigVisible = ref(false)
+const translationActionMode = ref('retranslate')
 
 // 原文和译文数据
 const originalTexts = ref([])  // 展开后的原文列表（用于显示）
@@ -302,6 +337,7 @@ const unbindPanListeners = () => {
 // 状态类和文本
 const statusClass = computed(() => {
   if (isCompleted.value) return 'completed'
+  if (isStopped.value) return 'stopped'
   if (isPaused.value) return 'paused'
   if (isTranslating.value) return 'translating'
   return 'idle'
@@ -309,6 +345,7 @@ const statusClass = computed(() => {
 
 const statusText = computed(() => {
   if (isCompleted.value) return '翻译完成'
+  if (isStopped.value) return '已停止'
   if (isPaused.value) return '已暂停'
   if (isTranslating.value) return '翻译中'
   return '准备中'
@@ -884,6 +921,20 @@ const initTranslation = async () => {
           const allTranslated = translatedTasks.every(t => 
             t.translation_status === 'success' || t.translation_status === 'failed'
           )
+
+          if (translationData.stopped && !allTranslated) {
+            const completedCount = translatedTasks.filter(t =>
+              t.translation_status === 'success' || t.translation_status === 'failed'
+            ).length
+            isTranslating.value = false
+            isCompleted.value = false
+            isStopped.value = true
+            currentCount.value = completedCount
+            progressPercent.value = Math.round((completedCount / totalCount.value) * 100)
+            progressMessage.value = '翻译已停止，可继续未完成任务或重新翻译'
+            window.$toast?.info('已加载停止时保留的翻译进度')
+            return
+          }
           
           if (allTranslated) {
             // 标记为完成状态
@@ -933,7 +984,8 @@ const initTranslation = async () => {
       enable_distribution: true,
       provider: llmProvider.value || undefined,
       base_url: llmBaseUrl.value || undefined,
-      model: llmModel.value || undefined
+      model: llmModel.value || undefined,
+      task_scope: 'all'
     })
 
     if (translateResult.code !== 200) {
@@ -959,8 +1011,31 @@ const initTranslation = async () => {
 // 加载已有的翻译结果
 const loadExistingTranslations = (translatedTasks) => {
   console.log(`加载 ${translatedTasks.length} 个已翻译任务`)
-  
+
+  // 以落盘结果为准完整重建界面状态，避免重试成功后残留旧的失败遮罩。
+  translatedTexts.value = originalTexts.value.map(() => null)
+  originalTexts.value.forEach((item) => {
+    item.translated = false
+    item.failed = false
+    item.error = null
+  })
+
   for (const task of translatedTasks) {
+    if (tasksMap.value[task.task_id]) {
+      tasksMap.value[task.task_id] = task
+    }
+
+    const taskFailed = task.translation_status === 'failed' || task.distribution_status === 'failed'
+    if (taskFailed) {
+      originalTexts.value.forEach((item) => {
+        if (item.task_id === task.task_id) {
+          item.failed = true
+          item.error = task.translation_error || task.distribution_error || '翻译失败'
+        }
+      })
+      continue
+    }
+
     if (task.translation_status !== 'success') {
       continue  // 跳过翻译失败的任务
     }
@@ -1027,7 +1102,12 @@ const connectSSE = (tid) => {
         
         if (data.phase === 'translation') {
           if (status === 'success') {
-            // 翻译成功（后端已计数，这里只用于显示）
+            originalTexts.value.forEach(item => {
+              if (item.task_id === result.task_id) {
+                item.failed = false
+                item.error = null
+              }
+            })
           } else if (status === 'failed') {
             const task = tasksMap.value[result.task_id]
             if (task?.is_aggregated) {
@@ -1047,7 +1127,12 @@ const connectSSE = (tid) => {
           }
         } else if (data.phase === 'distribution') {
           if (status === 'success') {
-            // 分配成功
+            originalTexts.value.forEach(item => {
+              if (item.task_id === result.task_id) {
+                item.failed = false
+                item.error = null
+              }
+            })
           } else if (status === 'failed') {
             // 分配失败：标记聚合任务的所有块为失败
             const task = tasksMap.value[result.task_id]
@@ -1086,7 +1171,7 @@ const connectSSE = (tid) => {
       }
 
       // 处理单条翻译结果
-      if (data.result && data.result.task_id) {
+      if (data.result && data.result.task_id && data.result.status === 'success') {
         const result = data.result
         const task = tasksMap.value[result.task_id]
         
@@ -1136,6 +1221,7 @@ const connectSSE = (tid) => {
       if (data.stage === 'completed') {
         isTranslating.value = false
         isCompleted.value = true
+        isStopped.value = false
         currentTranslatingIndex.value = -1
         
         // 显示完成消息，包含统计信息
@@ -1147,6 +1233,13 @@ const connectSSE = (tid) => {
           window.$toast?.success(`翻译完成！全部成功: ${successCount}`)
         }
         
+        eventSource?.close()
+        eventSource = null
+      } else if (data.stage === 'stopped') {
+        isTranslating.value = false
+        isCompleted.value = false
+        isStopped.value = true
+        progressMessage.value = data.message || '翻译已停止，进度已保留'
         eventSource?.close()
         eventSource = null
       } else if (data.stage === 'error') {
@@ -1167,6 +1260,112 @@ const connectSSE = (tid) => {
     if (isTranslating.value) {
       progressMessage.value = '推送连接中断，翻译仍在后台进行'
     }
+  }
+}
+
+const openTranslationAction = (mode) => {
+  if ((!isCompleted.value && !isStopped.value) || isTranslating.value) return
+  if (mode === 'retry-failed' && !hasFailedTasks.value) {
+    window.$toast?.info('当前没有失败任务')
+    return
+  }
+  if (mode === 'retranslate' && !confirm('重新翻译将覆盖当前整篇译文，是否继续选择模型？')) {
+    return
+  }
+  translationActionMode.value = mode
+  translationConfigVisible.value = true
+}
+
+const handleTranslationActionSubmit = async (config) => {
+  const retryFailedOnly = config.actionMode === 'retry-failed'
+  const continueUnfinished = config.actionMode === 'continue'
+  const wasStopped = isStopped.value
+  const failedTaskIds = new Set(
+    originalTexts.value.filter(item => item.failed).map(item => item.task_id)
+  )
+
+  try {
+    eventSource?.close()
+    eventSource = null
+    isPaused.value = false
+    isCompleted.value = false
+    isStopped.value = false
+    isTranslating.value = true
+    progressPercent.value = 0
+    progressMessage.value = retryFailedOnly
+      ? '正在创建失败任务重试...'
+      : continueUnfinished ? '正在继续未完成任务...' : '正在创建重新翻译任务...'
+    currentCount.value = 0
+
+    if (retryFailedOnly) {
+      originalTexts.value.forEach((item, index) => {
+        if (failedTaskIds.has(item.task_id)) {
+          item.failed = false
+          item.error = null
+          item.translated = false
+          translatedTexts.value[index] = null
+        }
+      })
+      totalCount.value = failedTaskIds.size || translationFailed.value
+      translationFailed.value = 0
+      distributionFailed.value = 0
+    } else if (continueUnfinished) {
+      const unfinishedTaskIds = new Set(
+        originalTexts.value
+          .filter(item => !item.translated && !item.failed)
+          .map(item => item.task_id)
+      )
+      totalCount.value = unfinishedTaskIds.size
+    } else {
+      originalTexts.value.forEach((item) => {
+        item.failed = false
+        item.error = null
+        item.translated = false
+      })
+      translatedTexts.value = originalTexts.value.map(() => null)
+      translationSuccess.value = 0
+      translationFailed.value = 0
+      distributionSuccess.value = 0
+      distributionFailed.value = 0
+      totalCount.value = Object.keys(tasksMap.value).length
+    }
+
+    apiKey.value = config.apiKey
+    llmProvider.value = config.provider
+    llmBaseUrl.value = config.baseUrl
+    llmModel.value = config.model
+    maxConcurrent.value = clampMaxConcurrent(config.maxConcurrent)
+
+    const result = await startTranslation({
+      pdf_name: pdfName.value,
+      api_key: apiKey.value,
+      use_dps: useDps.value,
+      max_concurrent: maxConcurrent.value,
+      enable_distribution: true,
+      provider: llmProvider.value || undefined,
+      base_url: llmBaseUrl.value || undefined,
+      model: llmModel.value || undefined,
+      task_scope: retryFailedOnly ? 'failed' : continueUnfinished ? 'unfinished' : 'all'
+    })
+
+    taskId = result?.data?.task_id
+    if (result?.code !== 200 || !taskId) {
+      throw new Error(result?.message || '创建翻译任务失败')
+    }
+
+    connectSSE(taskId)
+    window.$toast?.success(
+      retryFailedOnly ? '已开始重试失败任务' :
+        continueUnfinished ? '已继续翻译未完成任务' : '已开始重新翻译'
+    )
+  } catch (error) {
+    isTranslating.value = false
+    isCompleted.value = !wasStopped
+    isStopped.value = wasStopped
+    progressMessage.value = '任务创建失败'
+    console.error('[Translation] 创建重译任务失败:', error)
+    window.$toast?.error('创建翻译任务失败：' + (error.message || '未知错误'))
+    handleRefresh()
   }
 }
 
@@ -1276,7 +1475,10 @@ const handleStop = async () => {
       
       isTranslating.value = false
       isPaused.value = false
-      progressMessage.value = '已停止'
+      isCompleted.value = false
+      isStopped.value = true
+      progressMessage.value = '翻译已停止，可继续未完成任务或重新翻译'
+      taskId = null
       
       window.$toast?.info('已停止翻译，进度已保存')
       console.log('翻译已停止')
@@ -1719,6 +1921,40 @@ onUnmounted(() => {
     gap: 12px;
   }
 
+  .translation-action-btn {
+    height: 38px;
+    padding: 0 14px;
+    border: 1px solid #409eff;
+    border-radius: 10px;
+    background: #fff;
+    color: #409eff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px rgba(64, 158, 255, 0.2);
+    }
+
+    &.retry-failed-btn {
+      border-color: #e6a23c;
+      background: #fdf6ec;
+      color: #d48806;
+    }
+
+    &.continue-btn {
+      border-color: #67c23a;
+      background: #f0f9eb;
+      color: #529b2e;
+    }
+
+    &.retranslate-btn {
+      background: #ecf5ff;
+    }
+  }
+
   .translate-status {
     display: flex;
     align-items: center;
@@ -1756,6 +1992,15 @@ onUnmounted(() => {
       color: #e6a23c;
       .status-dot {
         background: #e6a23c;
+        animation: none;
+      }
+    }
+
+    &.stopped {
+      background: #fef0f0;
+      color: #f56c6c;
+      .status-dot {
+        background: #f56c6c;
         animation: none;
       }
     }

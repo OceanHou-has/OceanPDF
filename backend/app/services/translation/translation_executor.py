@@ -12,6 +12,8 @@ from app.services.translation.llm_service import create_translation_service
 
 class TranslationExecutor:
     """翻译执行器类"""
+
+    MAX_TASK_RETRIES = 3
     
     def __init__(self, api_key: str, control_flags: Optional[Dict] = None, llm_config: Optional[Dict] = None):
         """
@@ -46,54 +48,74 @@ class TranslationExecutor:
         task_id = task.get("task_id")
         is_aggregated = task.get("is_aggregated", False)
         
-        try:
-            # 获取待翻译文本
-            if is_aggregated:
-                # 组合块：使用聚合后的文本
-                source_text = task.get("aggregated_text", "")
-                logger.debug(f"翻译组合任务 {task_id}: {len(source_text)} 字符")
-            else:
-                # 独立块：使用原始文本
-                source_text = task.get("source_text", "")
-                logger.debug(f"翻译独立任务 {task_id}: {len(source_text)} 字符")
-            
-            if not source_text or not source_text.strip():
-                logger.warning(f"任务 {task_id} 没有待翻译文本")
+        # 获取待翻译文本
+        if is_aggregated:
+            source_text = task.get("aggregated_text", "")
+            logger.debug(f"翻译组合任务 {task_id}: {len(source_text)} 字符")
+        else:
+            source_text = task.get("source_text", "")
+            logger.debug(f"翻译独立任务 {task_id}: {len(source_text)} 字符")
+
+        if not source_text or not source_text.strip():
+            logger.warning(f"任务 {task_id} 没有待翻译文本")
+            return {
+                "task_id": task_id,
+                "status": "skipped",
+                "error": "没有待翻译文本",
+                "attempts": 0,
+                "retry_count": 0,
+            }
+
+        max_attempts = self.MAX_TASK_RETRIES + 1
+        last_error = "未知错误"
+        for attempt in range(1, max_attempts + 1):
+            try:
+                translated_text = await self.llm_service.translate_text_async(
+                    text=source_text,
+                    source_lang=source_lang,
+                    target_lang=target_lang,
+                    context=task.get("context", "body"),
+                    element_type=task.get("element_type", "paragraph"),
+                    task_id=task_id,
+                )
+
+                if attempt > 1:
+                    logger.info(f"翻译任务 {task_id} 第 {attempt} 次尝试成功")
                 return {
                     "task_id": task_id,
-                    "status": "skipped",
-                    "error": "没有待翻译文本"
+                    "is_aggregated": is_aggregated,
+                    "source_text": source_text,
+                    "translated_text": translated_text,
+                    "status": "success",
+                    "error": None,
+                    "attempts": attempt,
+                    "retry_count": attempt - 1,
                 }
-            
-            # 调用翻译服务
-            translated_text = await self.llm_service.translate_text_async(
-                text=source_text,
-                source_lang=source_lang,
-                target_lang=target_lang,
-                context=task.get("context", "body"),
-                element_type=task.get("element_type", "paragraph"),
-                task_id=task_id,
-            )
-            
-            return {
-                "task_id": task_id,
-                "is_aggregated": is_aggregated,
-                "source_text": source_text,
-                "translated_text": translated_text,
-                "status": "success",
-                "error": None
-            }
-            
-        except Exception as e:
-            logger.error(f"翻译任务 {task_id} 失败: {str(e)}")
-            return {
-                "task_id": task_id,
-                "is_aggregated": is_aggregated,
-                "source_text": task.get("aggregated_text" if is_aggregated else "source_text", ""),
-                "translated_text": None,
-                "status": "failed",
-                "error": str(e)
-            }
+            except Exception as e:
+                last_error = str(e)
+                if attempt >= max_attempts:
+                    break
+
+                retry_delay = min(2 ** (attempt - 1), 4)
+                logger.warning(
+                    f"翻译任务 {task_id} 第 {attempt} 次尝试失败，"
+                    f"{retry_delay}s 后重试 ({attempt}/{self.MAX_TASK_RETRIES}): {last_error}"
+                )
+                await asyncio.sleep(retry_delay)
+
+        logger.error(
+            f"翻译任务 {task_id} 已重试 {self.MAX_TASK_RETRIES} 次仍失败: {last_error}"
+        )
+        return {
+            "task_id": task_id,
+            "is_aggregated": is_aggregated,
+            "source_text": source_text,
+            "translated_text": None,
+            "status": "failed",
+            "error": last_error,
+            "attempts": max_attempts,
+            "retry_count": self.MAX_TASK_RETRIES,
+        }
     
     async def translate_batch_tasks(
         self,

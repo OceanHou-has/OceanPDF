@@ -13,6 +13,40 @@ from loguru import logger
 from app.core.config import settings
 
 
+def _resolve_param_policy(provider: str, model: str) -> Dict[str, bool]:
+    """
+    根据厂商与模型解析请求参数策略（依据各家最新官方文档）：
+    - OpenAI GPT-5.x / o 系列：max_tokens 已弃用且与推理模型不兼容，必须改用
+      max_completion_tokens；temperature 仅支持默认 1.0，传入其他值会返回 400。
+    - Google Gemini 3.x：官方要求 temperature 保持默认 1.0（Gemini 3.5 Flash 等
+      已不再支持该参数）。
+    - Moonshot Kimi K 系列：temperature 固定 1.0，传入其他值会报错。
+    其余厂商（DeepSeek / Qwen / Doubao / 智谱 GLM / 自定义）继续使用
+    temperature + max_tokens。
+    """
+    provider_id = (provider or "").strip().lower()
+    model_id = (model or "").strip().lower()
+
+    use_max_completion_tokens = False
+    omit_temperature = False
+
+    if provider_id == "openai":
+        if model_id.startswith(("gpt-5", "o1", "o3", "o4", "o5")):
+            use_max_completion_tokens = True
+            omit_temperature = True
+    elif provider_id == "google":
+        if model_id.startswith("gemini-3"):
+            omit_temperature = True
+    elif provider_id == "moonshot":
+        if model_id.startswith("kimi-k"):
+            omit_temperature = True
+
+    return {
+        "use_max_completion_tokens": use_max_completion_tokens,
+        "omit_temperature": omit_temperature,
+    }
+
+
 class LLMTranslationService:
     """通用大模型翻译服务类（OpenAI 兼容协议）"""
 
@@ -48,6 +82,7 @@ class LLMTranslationService:
         self.temperature = settings.DEEPSEEK_TEMPERATURE if temperature is None else temperature
         self.max_tokens = max_tokens or settings.DEEPSEEK_MAX_TOKENS
         self.timeout = timeout or settings.DEEPSEEK_TIMEOUT
+        self._param_policy = _resolve_param_policy(self.provider, self.model)
 
         try:
             self.client = OpenAI(
@@ -70,6 +105,22 @@ class LLMTranslationService:
             f"LLM 翻译服务初始化成功: provider={self.provider}, "
             f"model={self.model}, base_url={self.base_url}"
         )
+
+    def _build_completion_params(
+        self,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """按厂商/模型策略构造 chat.completions 请求参数"""
+        params: Dict[str, Any] = {}
+        if not self._param_policy["omit_temperature"]:
+            params["temperature"] = self.temperature if temperature is None else temperature
+        token_limit = max_tokens or self.max_tokens
+        if self._param_policy["use_max_completion_tokens"]:
+            params["max_completion_tokens"] = token_limit
+        else:
+            params["max_tokens"] = token_limit
+        return params
 
     def _build_translation_prompt(
         self,
@@ -166,9 +217,8 @@ class LLMTranslationService:
                     {"role": "system", "content": "You are a professional academic paper translator."},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-                stream=stream
+                stream=stream,
+                **self._build_completion_params()
             )
 
             if stream:
@@ -209,9 +259,8 @@ class LLMTranslationService:
                     {"role": "system", "content": "You are a professional academic paper translator."},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-                stream=False
+                stream=False,
+                **self._build_completion_params()
             )
 
             return response.choices[0].message.content.strip()
@@ -283,9 +332,8 @@ class LLMTranslationService:
         response = await self.async_client.chat.completions.create(
             model=self.model,
             messages=messages,
-            temperature=self.temperature if temperature is None else temperature,
-            max_tokens=max_tokens or self.max_tokens,
             stream=True,
+            **self._build_completion_params(temperature=temperature, max_tokens=max_tokens),
         )
 
         async for chunk in response:
@@ -371,8 +419,8 @@ class LLMTranslationService:
             response = await self.async_client.chat.completions.create(
                 model=self.model,
                 messages=[{"role": "user", "content": "hi"}],
-                max_tokens=1,
-                timeout=test_timeout * 2
+                timeout=test_timeout * 2,
+                **self._build_completion_params(max_tokens=1),
             )
             return {
                 "success": True,
@@ -398,6 +446,72 @@ class LLMTranslationService:
             "provider": self.provider,
             "model": self.model
         }
+
+
+def _probe_fail(message: str) -> Dict[str, Any]:
+    return {"success": False, "message": message}
+
+
+async def _probe_chat_completion(
+    session: aiohttp.ClientSession,
+    base_url: str,
+    api_key: str,
+    provider: str,
+    model: str,
+) -> Dict[str, Any]:
+    """
+    对参数敏感的厂商（OpenAI / Gemini / Kimi）发一次最小对话请求，
+    验证模型名称与请求参数真实可用（/models 通过不代表翻译请求可用）。
+    """
+    url = base_url.strip().rstrip("/") + "/chat/completions"
+    policy = _resolve_param_policy(provider, model)
+    body: Dict[str, Any] = {
+        "model": model,
+        "messages": [{"role": "user", "content": "hi"}],
+        "stream": False,
+    }
+    if policy["use_max_completion_tokens"]:
+        body["max_completion_tokens"] = 1
+    else:
+        body["max_tokens"] = 1
+    if not policy["omit_temperature"]:
+        body["temperature"] = 0.3
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+    try:
+        async with session.post(
+            url,
+            json=body,
+            headers=headers,
+            timeout=aiohttp.ClientTimeout(total=15),
+        ) as resp:
+            if resp.status == 200:
+                return {"success": True, "message": f"连接正常，对话验证通过（{provider} / {model}）"}
+            try:
+                data = await resp.json(content_type=None)
+            except Exception:
+                data = {}
+            if resp.status in (401, 403):
+                return _probe_fail("认证失败: API Key 无效或已过期")
+            if resp.status == 429:
+                return {"success": True, "message": f"连接正常，但请求频率过高（{provider}）"}
+            msg = ""
+            if isinstance(data, dict):
+                err = data.get("error") or {}
+                if isinstance(err, dict):
+                    msg = err.get("message", "") or err.get("code", "")
+                else:
+                    msg = str(err)
+            return _probe_fail(f"对话请求失败 (HTTP {resp.status}): {msg or '未知错误'}")
+    except asyncio.TimeoutError:
+        return _probe_fail("对话验证超时（>15秒），请检查网络连接或接口地址")
+    except aiohttp.ClientError as e:
+        return _probe_fail(f"无法连接到服务，请检查接口地址和网络: {str(e)[:200]}")
+    except Exception as e:
+        return _probe_fail(f"对话验证异常: {str(e)[:200]}")
 
 
 async def test_llm_connection_lightweight(
@@ -441,6 +555,21 @@ async def test_llm_connection_lightweight(
                         model_ids = [m.get("id", "") for m in (data.get("data") or [])][:5]
                     except Exception:
                         pass
+                    # /models 通过不代表翻译请求可用（如 GPT-5.6 会拒绝 max_tokens/temperature）
+                    if provider_name in ("openai", "google", "moonshot", "doubao"):
+                        probe = await _probe_chat_completion(
+                            session=session,
+                            base_url=base_url,
+                            api_key=api_key,
+                            provider=provider_name,
+                            model=model_name,
+                        )
+                        if not probe.get("success"):
+                            return probe
+                        return _ok(
+                            probe.get("message") or f"连接正常（{provider_name} / {model_name}）",
+                            {"available_models": model_ids},
+                        )
                     return _ok(f"连接正常（{provider_name} / {model_name}）", {"available_models": model_ids})
                 if resp.status in (401, 403):
                     return _fail("认证失败: API Key 无效或已过期")

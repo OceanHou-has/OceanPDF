@@ -94,7 +94,7 @@
     </header>
 
     <!-- PDF 显示区域 -->
-    <main class="pdf-viewer" @wheel="handleWheel">
+    <main class="pdf-viewer" ref="viewerRef" @wheel="handleWheel">
       <div class="canvas-container" v-loading="loading" element-loading-text="加载中...">
         <div 
           class="pdf-canvas-wrapper" 
@@ -249,6 +249,10 @@ const scale = ref(1.0)
 const loading = ref(false)
 const hoveredElement = ref(null)
 const showDpsResults = ref(false)
+
+// 进入界面时是否已按页面高度自动适配过（避免翻页时重置用户手动缩放）
+const hasAutoFitted = ref(false)
+const viewerRef = ref(null)
 
 // 框选相关
 const isSelecting = ref(false)
@@ -559,6 +563,20 @@ const zoomOut = () => {
   if (scale.value > 0.5) {
     scale.value -= 0.2
   }
+}
+
+// 进入界面时按视口高度适配：让整页在高度方向上占满可视区域
+const fitPageToViewerHeight = () => {
+  const viewer = viewerRef.value
+  if (!viewer || !imageHeight.value) return
+
+  const verticalPadding = 48 // .pdf-viewer 上下各 24px
+  const availableHeight = viewer.clientHeight - verticalPadding
+  if (availableHeight <= 0) return
+
+  const fitScale = availableHeight / imageHeight.value
+  // 页面过矮时不超过 100%，避免放大模糊；用户仍可通过缩放按钮继续调整
+  scale.value = Math.min(Math.max(fitScale, 0.1), 1)
 }
 
 const handleWheel = (e) => {
@@ -1133,6 +1151,11 @@ const loadPageImage = async () => {
       pageImage.value = response.data.data.image
       imageWidth.value = response.data.data.width
       imageHeight.value = response.data.data.height
+      // 首次进入界面时按高度占满适配，之后翻页保持当前缩放
+      if (!hasAutoFitted.value) {
+        fitPageToViewerHeight()
+        hasAutoFitted.value = true
+      }
       console.log('[PDFAnnotation] 页面图片加载完成:', {
         page: currentPage.value,
         imageWidth: imageWidth.value,

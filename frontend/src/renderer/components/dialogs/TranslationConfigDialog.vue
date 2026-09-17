@@ -21,8 +21,8 @@
       <div class="dialog-header">
         <div class="header-content">
           <div class="header-text">
-            <h2 class="header-title">翻译配置</h2>
-            <p class="header-subtitle">配置翻译模型、语言与解析参数</p>
+            <h2 class="header-title">{{ dialogTitle }}</h2>
+            <p class="header-subtitle">{{ dialogSubtitle }}</p>
           </div>
         </div>
         <button class="close-btn" @click="handleCancel" title="关闭">
@@ -35,7 +35,7 @@
       <div class="config-card">
         <div class="config-container">
           <!-- 解析模式选择 -->
-          <div class="config-section section-blue">
+          <div v-if="!modelOnly" class="config-section section-blue">
             <div class="section-header">
               <h3 class="section-title">解析模式</h3>
               <span class="badge badge-required">必选</span>
@@ -82,7 +82,7 @@
           </div>
 
           <!-- 语言设置 -->
-          <div class="config-section section-green">
+          <div v-if="!modelOnly" class="config-section section-green">
             <div class="section-header">
               <h3 class="section-title">语言设置</h3>
             </div>
@@ -119,7 +119,7 @@
           </div>
 
           <!-- 高级选项 -->
-          <div class="config-section section-purple">
+          <div v-if="!modelOnly" class="config-section section-purple">
             <div class="section-header">
               <h3 class="section-title">高级选项</h3>
               <span class="badge badge-optional">可选</span>
@@ -261,7 +261,7 @@
             :disabled="!canStartTranslate"
             @click="handleStartTranslate"
           >
-            开始翻译
+            {{ actionButtonText }}
           </button>
         </div>
       </div>
@@ -284,10 +284,15 @@ const props = defineProps({
   pdfName: {
     type: String,
     required: true
+  },
+  actionMode: {
+    type: String,
+    default: 'start',
+    validator: (value) => ['start', 'retranslate', 'retry-failed', 'continue'].includes(value)
   }
 })
 
-const emit = defineEmits(['update:modelValue', 'dialog-closed'])
+const emit = defineEmits(['update:modelValue', 'dialog-closed', 'submit'])
 
 const dialogVisible = computed({
   get: () => props.modelValue,
@@ -316,6 +321,54 @@ const FALLBACK_PROVIDERS = [
     models: ['deepseek-v4-flash', 'deepseek-v4-pro'], default_model: 'deepseek-v4-flash',
     key_placeholder: '输入 DeepSeek API 密钥（sk-...）',
     key_url: 'https://platform.deepseek.com/api_keys'
+  },
+  {
+    id: 'qwen', name: '通义千问 (Qwen)', emoji: '☁️',
+    description: '阿里云百炼 DashScope 兼容模式',
+    default_base_url: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    models: ['qwen3.7-max', 'qwen3.7-plus', 'qwen3.7-flash', 'qwen-max', 'qwen-plus', 'qwen-turbo'], default_model: 'qwen-plus',
+    key_placeholder: '输入阿里云百炼 API 密钥（sk-...）',
+    key_url: 'https://bailian.console.aliyun.com/'
+  },
+  {
+    id: 'doubao', name: '豆包 (Doubao)', emoji: '🌱',
+    description: '火山引擎方舟平台，模型需先开通；可用完整版本化模型 ID 或推理接入点 ID（ep-...）',
+    default_base_url: 'https://ark.cn-beijing.volces.com/api/v3',
+    models: ['doubao-seed-2-1-pro-260628', 'doubao-seed-2-1-turbo-260628', 'doubao-seed-evolving'], default_model: 'doubao-seed-2-1-pro-260628',
+    key_placeholder: '输入火山方舟 API Key',
+    key_url: 'https://console.volcengine.com/ark'
+  },
+  {
+    id: 'google', name: 'Google Gemini', emoji: '✨',
+    description: '通过 Gemini OpenAI 兼容端点接入（可能需要代理）',
+    default_base_url: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+    models: ['gemini-3.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash'], default_model: 'gemini-3.5-flash',
+    key_placeholder: '输入 Google AI Studio API Key',
+    key_url: 'https://aistudio.google.com/apikey'
+  },
+  {
+    id: 'openai', name: 'OpenAI (GPT)', emoji: '🤖',
+    description: 'OpenAI 官方接口（可能需要代理）',
+    default_base_url: 'https://api.openai.com/v1',
+    models: ['gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.6-sol', 'gpt-5.5', 'gpt-4o'], default_model: 'gpt-5.6-terra',
+    key_placeholder: '输入 OpenAI API Key（sk-...）',
+    key_url: 'https://platform.openai.com/api-keys'
+  },
+  {
+    id: 'moonshot', name: 'Moonshot (Kimi)', emoji: '🌙',
+    description: '月之暗面 Kimi 开放平台',
+    default_base_url: 'https://api.moonshot.cn/v1',
+    models: ['kimi-k3', 'kimi-k2.6', 'kimi-k2.7-code', 'kimi-k2.7-code-highspeed'], default_model: 'kimi-k3',
+    key_placeholder: '输入 Moonshot API Key',
+    key_url: 'https://platform.moonshot.cn/'
+  },
+  {
+    id: 'zhipu', name: '智谱 GLM', emoji: '🧠',
+    description: '智谱 AI 开放平台',
+    default_base_url: 'https://open.bigmodel.cn/api/paas/v4',
+    models: ['glm-5.3', 'glm-5.2', 'glm-5.2-highspeed', 'glm-4-plus', 'glm-4-flash'], default_model: 'glm-5.3',
+    key_placeholder: '输入智谱 API Key',
+    key_url: 'https://open.bigmodel.cn/'
   },
   {
     id: 'custom', name: '自定义 (OpenAI 兼容)', emoji: '🛠️',
@@ -378,15 +431,18 @@ const canStartTranslate = computed(() => {
 })
 
 // 选择厂商：自动填充默认 base_url 与模型
-const selectProvider = (provider) => {
+const selectProvider = async (provider) => {
   if (config.value.provider === provider.id) return
   config.value.provider = provider.id
   config.value.baseUrl = provider.default_base_url || ''
   config.value.model = provider.default_model || ''
+  config.value.apiKey = ''
   // 切换厂商后重置测试状态
   testSuccess.value = false
   testError.value = false
   testErrorMessage.value = ''
+  // 加载该厂商独立保存的配置（Key / 接口 / 模型）
+  await loadProviderSavedConfig(provider.id)
 }
 
 // 加载厂商列表（返回是否从后端成功加载，供模型校验判断能否信任列表）
@@ -409,7 +465,7 @@ const loadProviders = async () => {
 watch(() => props.modelValue, async (newValue, oldValue) => {
   if (newValue) {
     resetConfig()
-    await Promise.all([loadProviders(), loadSavedModelConfig()])
+    await Promise.all([loadProviders(), loadLastSavedConfig()])
     // 加载完成后校验模型有效性，若已下线则回退到厂商默认
     validateCurrentModel()
   } else if (oldValue === true && newValue === false) {
@@ -421,10 +477,29 @@ watch(() => props.modelValue, async (newValue, oldValue) => {
 onMounted(async () => {
   if (props.modelValue) {
     resetConfig()
-    await Promise.all([loadProviders(), loadSavedModelConfig()])
+    await Promise.all([loadProviders(), loadLastSavedConfig()])
     validateCurrentModel()
   }
 })
+
+const modelOnly = computed(() => props.actionMode !== 'start')
+const dialogTitle = computed(() => {
+  if (props.actionMode === 'retry-failed') return '重试失败任务'
+  if (props.actionMode === 'continue') return '继续翻译'
+  if (props.actionMode === 'retranslate') return '重新翻译'
+  return '翻译配置'
+})
+const dialogSubtitle = computed(() => {
+  if (props.actionMode === 'retry-failed') return '选择模型，仅重新执行当前失败的翻译组'
+  if (props.actionMode === 'continue') return '选择模型，从停止位置继续执行未完成的翻译组'
+  if (props.actionMode === 'retranslate') return '选择模型，重新翻译整篇论文'
+  return '配置翻译模型、语言与解析参数'
+})
+const actionButtonText = computed(() => (
+  props.actionMode === 'retry-failed' ? '开始重试' :
+    props.actionMode === 'continue' ? '继续翻译' :
+    props.actionMode === 'retranslate' ? '开始重新翻译' : '开始翻译'
+))
 
 // 重置配置为默认值
 const resetConfig = () => {
@@ -455,8 +530,37 @@ const validateCurrentModel = () => {
   }
 }
 
-// 加载已保存的翻译模型配置（厂商/base_url/模型/API Key/并发数）
-const loadSavedModelConfig = async () => {
+// 加载指定厂商独立保存的翻译模型配置（Key / base_url / 模型）
+const loadProviderSavedConfig = async (providerId) => {
+  try {
+    const response = await axios.get(
+      'http://127.0.0.1:8000/api/v1/translation/config/model-config',
+      { params: { provider: providerId } }
+    )
+    if (response.data.code === 200 && response.data.data) {
+      const saved = response.data.data
+      // 防止快速切换厂商时旧响应覆盖当前表单
+      if (config.value.provider !== providerId) return
+      if (saved.base_url) config.value.baseUrl = saved.base_url
+      if (saved.model) {
+        // 已保存模型若已不在厂商列表（如旧的点号模型名），自动回退到厂商默认
+        const provider = providers.value.find(p => p.id === providerId)
+        if (provider?.models?.length && !provider.models.includes(saved.model)) {
+          config.value.model = provider.default_model || ''
+        } else {
+          config.value.model = saved.model
+        }
+      }
+      config.value.apiKey = saved.api_key || ''
+      console.log(`加载 ${providerId} 已保存配置:`, saved.model, saved.masked_key)
+    }
+  } catch (error) {
+    console.log(`加载 ${providerId} 已保存配置失败`)
+  }
+}
+
+// 打开对话框时恢复最近一次使用的厂商配置（含并发数）
+const loadLastSavedConfig = async () => {
   try {
     const [modelRes, concurrentRes] = await Promise.all([
       axios.get('http://127.0.0.1:8000/api/v1/translation/config/model-config'),
@@ -467,8 +571,8 @@ const loadSavedModelConfig = async () => {
       if (saved.provider) config.value.provider = saved.provider
       if (saved.base_url) config.value.baseUrl = saved.base_url
       if (saved.model) config.value.model = saved.model
-      if (saved.api_key) config.value.apiKey = saved.api_key
-      console.log('加载已保存的翻译模型配置:', saved.provider, saved.model, saved.masked_key)
+      config.value.apiKey = saved.api_key || ''
+      console.log('加载最近使用的翻译配置:', saved.provider, saved.model, saved.masked_key)
     }
     if (concurrentRes?.data?.code === 200 && concurrentRes.data.data) {
       const mc = concurrentRes.data.data.max_concurrent
@@ -588,10 +692,22 @@ const handleStartTranslate = async () => {
   }
 
   // 开始前静默保存一次配置（无需测试成功也可保存）
-  saveModelConfig()
+  await saveModelConfig()
 
-  // 关闭对话框并跳转到翻译执行页面
+  // 翻译执行页中的重译操作复用本弹窗，但直接回传模型配置，不再进行路由跳转。
   dialogVisible.value = false
+
+  if (props.actionMode !== 'start') {
+    emit('submit', {
+      actionMode: props.actionMode,
+      provider: config.value.provider,
+      baseUrl: config.value.baseUrl.trim(),
+      model: config.value.model.trim(),
+      apiKey: config.value.apiKey.trim(),
+      maxConcurrent: config.value.maxConcurrent
+    })
+    return
+  }
 
   router.push({
     path: '/translation',

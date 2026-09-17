@@ -41,6 +41,30 @@
           <span>设置</span>
         </div>
       </nav>
+
+      <!-- 侧边栏底部：GitHub + 开发者信息 -->
+      <div class="sidebar-footer">
+        <el-tooltip content="跪求Star⭐" placement="top" :show-after="150">
+          <button
+            class="sidebar-link"
+            type="button"
+            @click="openGithub"
+            aria-label="GitHub 主页"
+          >
+            <img class="sidebar-icon" :src="githubIcon" alt="GitHub" />
+            <span>GitHub</span>
+          </button>
+        </el-tooltip>
+        <button
+          class="sidebar-link"
+          type="button"
+          @click="developerDialogVisible = true"
+          aria-label="开发者信息"
+        >
+          <img class="sidebar-icon" :src="devIcon" alt="开发者信息" />
+          <span>开发者信息</span>
+        </button>
+      </div>
     </aside>
 
     <!-- 主内容区域 -->
@@ -143,6 +167,9 @@
 
     <!-- API Key 申请帮助弹窗 -->
     <HelpDialog v-model="helpDialogVisible" />
+
+    <!-- 开发者信息弹窗 -->
+    <DeveloperInfoDialog v-model="developerDialogVisible" />
 
     <!-- 批量翻译配置对话框 -->
     <el-dialog
@@ -248,12 +275,25 @@ import ToolsView from './Tools.vue'
 import Button1 from '../elements/button/button1.vue'
 import UpdateButton from '../components/UpdateButton.vue'
 import HelpDialog from '../components/dialogs/HelpDialog.vue'
+import DeveloperInfoDialog from '../components/dialogs/DeveloperInfoDialog.vue'
 import waveIcon from '../elements/icon/海浪.svg'
+import githubIcon from '../elements/icon/github.svg'
+import devIcon from '../elements/icon/开发者.svg'
 import { generatePretranslation, startTranslation, getApiKey, getMaxConcurrent } from '../api/pdf'
+
+// GitHub 仓库页面
+const GITHUB_HOME = 'https://github.com/OceanHou-has/OceanPDF'
+
+// 打开 GitHub 主页（Electron 中由主进程拦截并调用系统浏览器打开）
+const openGithub = () => {
+  window.open(GITHUB_HOME, '_blank', 'noopener,noreferrer')
+}
 
 // 当前视图
 const currentView = ref('upload')
 const parallelism = ref(2)
+// 开发者信息弹窗
+const developerDialogVisible = ref(false)
 // ParsedList组件引用
 const parsedListRef = ref(null)
 // 刷新状态
@@ -560,6 +600,51 @@ const confirmBatchTranslate = async () => {
         .el-icon {
           color: #4F6BFF;
         }
+      }
+    }
+  }
+
+  // 侧边栏底部：GitHub + 开发者信息
+  .sidebar-footer {
+    padding: 12px 10px;
+    border-top: 1px solid #E5E7EB;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    .sidebar-link {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 12px 16px;
+      margin: 0;
+      border: none;
+      border-radius: 12px;
+      background: transparent;
+      cursor: pointer;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      font-size: 16px;
+      font-weight: 500;
+      letter-spacing: 0.2px;
+      line-height: 1.1;
+      color: #111827;
+      transition: background 0.2s ease, box-shadow 0.2s ease;
+
+      .sidebar-icon {
+        width: 20px;
+        height: 20px;
+        flex: 0 0 auto;
+        display: block;
+      }
+
+      &:hover {
+        background: rgba(79, 107, 255, 0.08);
+        box-shadow: 0 6px 16px rgba(79, 107, 255, 0.12);
+      }
+
+      &:active {
+        transform: translateY(1px);
       }
     }
   }

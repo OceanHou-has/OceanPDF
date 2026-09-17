@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from typing import Optional, Dict
+from typing import Optional, Dict, Literal
 from loguru import logger
 from pathlib import Path
 import asyncio
@@ -236,6 +236,11 @@ async def save_api_key(api_key: str = Query(..., description="DeepSeek API Key")
         # 更新 API Key（若传入的是脱敏占位值则保留已有密钥，避免覆盖丢失）
         if "***" not in api_key:
             config["deepseek_api_key"] = api_key
+            # 同步到按厂商存储的配置槽位
+            model_configs = config.setdefault("model_configs", {})
+            deepseek_cfg = model_configs.setdefault("deepseek", {"provider": "deepseek"})
+            deepseek_cfg["api_key"] = api_key
+            config["model_configs"] = model_configs
         elif not config.get("deepseek_api_key"):
             raise HTTPException(status_code=400, detail="请重新填写完整的 API Key")
         
@@ -282,9 +287,14 @@ async def get_api_key():
         with open(config_file, 'r', encoding='utf-8') as f:
             config = json.load(f)
         
-        # 优先读取新版模型配置中的 api_key，兼容旧版 deepseek_api_key
-        model_config = config.get("model_config") or {}
-        api_key = model_config.get("api_key") or config.get("deepseek_api_key", "")
+        # 优先读取 DeepSeek 槽位中的 api_key，兼容旧版 deepseek_api_key
+        model_configs = config.get("model_configs") or {}
+        deepseek_cfg = model_configs.get("deepseek") or {}
+        api_key = deepseek_cfg.get("api_key") or config.get("deepseek_api_key", "")
+        if not api_key:
+            model_config = config.get("model_config") or {}
+            if model_config.get("provider") == "deepseek":
+                api_key = model_config.get("api_key") or ""
         
         return {
             "code": 200,
@@ -336,10 +346,17 @@ async def save_model_config(model_config: TranslationModelConfig):
         provider = model_config.provider or "deepseek"
         api_key = (model_config.api_key or "").strip()
 
+        model_configs = config.setdefault("model_configs", {})
+
         # 若传入的是脱敏占位值（含***），保留已保存的真实密钥（仅限同一厂商）
         if "***" in api_key:
-            existing = config.get("model_config") or {}
-            if existing.get("provider") == provider and existing.get("api_key") and "***" not in existing["api_key"]:
+            existing = model_configs.get(provider) or {}
+            if (not existing.get("api_key") or "***" in existing["api_key"]):
+                # 槽位缺失时回退旧版单条配置（需属于同一厂商）
+                legacy = config.get("model_config") or {}
+                if legacy.get("provider") == provider and legacy.get("api_key") and "***" not in legacy["api_key"]:
+                    existing = legacy
+            if existing.get("api_key") and "***" not in existing["api_key"]:
                 api_key = existing["api_key"]
             else:
                 api_key = ""
@@ -350,6 +367,10 @@ async def save_model_config(model_config: TranslationModelConfig):
             "model": (model_config.model or "").strip(),
             "api_key": api_key,
         }
+        model_configs[provider] = saved
+        config["model_configs"] = model_configs
+
+        # 旧字段同步：最近一次保存的厂商配置（供旧调用方 / AI 问答使用）
         config["model_config"] = saved
 
         # 向后兼容：DeepSeek 厂商同步写入旧字段
@@ -377,35 +398,57 @@ async def save_model_config(model_config: TranslationModelConfig):
 
 
 @router.get("/translation/config/model-config")
-async def get_model_config():
+async def get_model_config(
+    provider: Optional[str] = Query(None, description="厂商ID，缺省返回最近一次保存的配置")
+):
     """
-    获取已保存的翻译模型配置（不存在时回退旧版 DeepSeek 配置）
+    获取已保存的翻译模型配置（按厂商独立存储；不存在时回退默认配置与旧版 DeepSeek 字段）
     """
     try:
         config = _read_translation_config_file()
+        model_configs = config.get("model_configs") or {}
+        provider_id = (provider or "").strip() or None
 
-        model_config = config.get("model_config")
+        model_config = None
+        if provider_id:
+            model_config = model_configs.get(provider_id)
+            if not model_config:
+                # 兼容旧版单条配置：仅当它属于请求的厂商时复用
+                legacy = config.get("model_config")
+                if legacy and legacy.get("provider") == provider_id:
+                    model_config = legacy
+        else:
+            # 未指定厂商：保持旧行为，返回最近一次保存的配置
+            model_config = config.get("model_config")
+
         if not model_config:
-            # 兼容旧版本：仅有 deepseek_api_key 的情况
-            legacy_key = config.get("deepseek_api_key", "")
-            provider_info = get_provider("deepseek") or {}
+            resolved_provider = provider_id or "deepseek"
+            provider_info = get_provider(resolved_provider) or {}
             model_config = {
-                "provider": "deepseek",
+                "provider": resolved_provider,
                 "base_url": provider_info.get("default_base_url", ""),
                 "model": provider_info.get("default_model", ""),
-                "api_key": legacy_key
+                "api_key": "",
             }
+
+        # 兼容旧版本：DeepSeek 仅有 deepseek_api_key 的情况
+        if model_config.get("provider") == "deepseek" and not model_config.get("api_key"):
+            model_config["api_key"] = config.get("deepseek_api_key", "")
 
         # 修复历史脏数据：若密钥被脱敏占位值污染，清空并落盘，提示用户重新填写
         dirty = False
         if "***" in (model_config.get("api_key") or ""):
             model_config["api_key"] = ""
-            config["model_config"] = model_config
             dirty = True
         if "***" in (config.get("deepseek_api_key") or ""):
             config["deepseek_api_key"] = ""
             dirty = True
         if dirty:
+            if provider_id:
+                model_configs[provider_id] = model_config
+                config["model_configs"] = model_configs
+            else:
+                config["model_config"] = model_config
             _write_translation_config_file(config)
             logger.warning("检测到脱敏占位值污染翻译配置，已清空，请重新填写 API Key")
 
@@ -498,6 +541,10 @@ class TranslationRequest(BaseModel):
     provider: Optional[str] = Field(None, description="大模型厂商ID（缺省 deepseek）")
     base_url: Optional[str] = Field(None, description="OpenAI 兼容接口地址（缺省回退 DeepSeek）")
     model: Optional[str] = Field(None, description="模型名称（缺省回退 DeepSeek 默认模型）")
+    task_scope: Literal["all", "failed", "unfinished"] = Field(
+        "all",
+        description="任务范围：all=整篇翻译，failed=仅失败任务，unfinished=仅未完成任务",
+    )
 
 
 def _build_llm_config(request: TranslationRequest) -> Dict:
@@ -554,7 +601,8 @@ async def translate_pdf(
             use_dps=request.use_dps,
             max_concurrent=request.max_concurrent,
             enable_distribution=request.enable_distribution,
-            llm_config=_build_llm_config(request)
+            llm_config=_build_llm_config(request),
+            task_scope=request.task_scope,
         )
         
         if not result.get("success"):
@@ -610,7 +658,8 @@ async def translate_pdf_async(request: TranslationRequest):
             f"[翻译异步] 创建任务: task_id={task_id[:8]} | pdf={request.pdf_name} | "
             f"use_dps={request.use_dps} | max_concurrent={request.max_concurrent} | "
             f"enable_distribution={request.enable_distribution} | provider={request.provider or 'deepseek'} | "
-            f"model={request.model or '-'} | api_key={_mask_api_key(request.api_key)}"
+            f"model={request.model or '-'} | task_scope={request.task_scope} | "
+            f"api_key={_mask_api_key(request.api_key)}"
         )
 
         async def run_translation():
@@ -699,7 +748,8 @@ async def translate_pdf_async(request: TranslationRequest):
                     enable_distribution=request.enable_distribution,
                     progress_callback=on_progress,
                     control_flags=translation_control_flags.get(task_id),  # 【新增】传递控制标志
-                    llm_config=_build_llm_config(request)  # 【新增】传递大模型厂商配置
+                    llm_config=_build_llm_config(request),  # 【新增】传递大模型厂商配置
+                    task_scope=request.task_scope,
                 )
 
                 record = translation_progress_store.get(task_id)
@@ -708,12 +758,16 @@ async def translate_pdf_async(request: TranslationRequest):
 
                 record["seq"] += 1
                 if result.get("success"):
-                    record["progress"] = 100
-                    record["stage"] = "completed"
-                    record["message"] = "翻译完成"
+                    stopped = bool(result.get("stopped"))
+                    record["progress"] = record.get("progress", 0) if stopped else 100
+                    record["stage"] = "stopped" if stopped else "completed"
+                    record["message"] = "翻译已停止，进度已保留" if stopped else "翻译完成"
                     record["file_path"] = result.get("file_path")
                     record["finished_at"] = time.time()
-                    logger.info(f"[翻译异步] 完成: task_id={task_id[:8]} | file={record['file_path']}")
+                    logger.info(
+                        f"[翻译异步] {'停止' if stopped else '完成'}: "
+                        f"task_id={task_id[:8]} | file={record['file_path']}"
+                    )
                 else:
                     record["progress"] = 0
                     record["stage"] = "error"
@@ -967,7 +1021,7 @@ async def resume_translation(task_id: str):
 @router.post("/translation/control/{task_id}/stop")
 async def stop_translation(task_id: str):
     """
-    停止翻译任务（【新增】删除翻译结果文件）
+    停止翻译任务并保留已完成结果，以便继续未完成任务或整篇重译
     
     Args:
         task_id: 任务ID
@@ -980,30 +1034,25 @@ async def stop_translation(task_id: str):
             raise HTTPException(status_code=404, detail="任务不存在")
         
         # 设置停止标志
-        translation_control_flags[task_id]["stopped"] = True
+        flags = translation_control_flags[task_id]
+        flags["stopped"] = True
         logger.info(f"[翻译控制] 停止: task_id={task_id[:8]}")
-        
-        # 【关键新增】删除翻译结果文件
+
+        # 立即取消当前正在等待的大模型请求，任务服务随后会保存 pending/success 状态。
+        for running_task in list(flags.get("active_tasks") or []):
+            running_task.cancel()
+
         record = translation_progress_store.get(task_id)
+        # 给后台协程短暂时间完成取消与原子落盘，避免用户立即续跑时发生文件竞争。
         if record:
-            pdf_name = record.get("pdf_name")
-            use_dps = record.get("use_dps", False)
-            
-            if pdf_name:
-                from pathlib import Path
-                task_service = TranslationTaskService()
-                translation_file = task_service.get_translation_result_path(pdf_name, use_dps)
-                
-                if translation_file.exists():
-                    try:
-                        translation_file.unlink()
-                        logger.info(f"[翻译控制] 删除翻译文件: {translation_file}")
-                    except Exception as e:
-                        logger.error(f"[翻译控制] 删除翻译文件失败: {str(e)}")
+            for _ in range(50):
+                if record.get("finished_at") is not None:
+                    break
+                await asyncio.sleep(0.1)
         
         return {
             "code": 200,
-            "message": "已停止翻译任务并删除翻译结果",
+            "message": "已停止翻译任务，已完成进度已保留",
             "data": {"task_id": task_id, "stopped": True}
         }
     except HTTPException:

@@ -45,6 +45,27 @@ class DPSService:
             return layout_ready
         return layout_ready and ocr_status == "ready"
 
+    async def check_health(self, need_ocr: bool, timeout_sec: float = 5.0) -> Dict[str, Any]:
+        """单次快速健康检查，供提交解析任务前的连通性预检使用。"""
+        client_timeout = aiohttp.ClientTimeout(total=timeout_sec)
+        async with aiohttp.ClientSession(timeout=client_timeout) as session:
+            health = await self._get_health(session)
+
+        if self._is_ready(health, need_ocr=need_ocr):
+            return health
+
+        not_ready = []
+        layout_status = (health.get("layout_status") or {}).get("status")
+        ocr_status = (health.get("ocr_status") or {}).get("status")
+        if layout_status != "ready":
+            not_ready.append(f"版面模型({layout_status or 'unknown'})")
+        if need_ocr and ocr_status != "ready":
+            not_ready.append(f"OCR模型({ocr_status or 'unknown'})")
+        raise RuntimeError(
+            f"DPS模型未就绪：{'、'.join(not_ready) or '模型加载中'}。"
+            "请等待DPS服务完成模型加载后重试。"
+        )
+
     async def wait_until_ready(self, need_ocr: bool) -> Dict[str, Any]:
         timeout_total = float(settings.DPS_HEALTH_TIMEOUT_SEC)
         interval = float(settings.DPS_HEALTH_POLL_INTERVAL_SEC)

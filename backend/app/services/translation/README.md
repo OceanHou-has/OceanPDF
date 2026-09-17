@@ -21,7 +21,7 @@
 ```env
 DEEPSEEK_API_KEY=your_deepseek_api_key_here
 DEEPSEEK_API_BASE=https://api.deepseek.com
-DEEPSEEK_MODEL=deepseek-chat
+DEEPSEEK_MODEL=deepseek-v4-flash
 DEEPSEEK_TEMPERATURE=0.3
 DEEPSEEK_MAX_TOKENS=4096
 DEEPSEEK_TIMEOUT=60
