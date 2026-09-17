@@ -33,6 +33,14 @@
         </div>
       </div>
 
+      <div class="author-card">
+        <div class="author-avatar" aria-hidden="true">🐬</div>
+        <div class="author-info">
+          <div class="author-name">Luli</div>
+          <div class="author-meta">中南大学在读硕士 · 扭曲丛林第一豹女🐆</div>
+        </div>
+      </div>
+
       <!-- 联系方式 -->
       <div class="contact-card">
         <div class="contact-label">📮 联系方式</div>
